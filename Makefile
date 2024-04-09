@@ -4,9 +4,11 @@
 # EXEC: The executable name
 
 # Specify source files
-SRC_CPPS := main.cpp
+BUILD_DIR := build
+SRC_DIR := src
 
-EXEC     := pam
+SRC_CPPS := $(wildcard $(SRC_DIR)/*.cpp)
+EXEC     := $(BUILD_DIR)/pam
 
 # Checks if source files exist
 ifeq ($(SRC_CS) $(SRC_CPPS),)
@@ -76,14 +78,11 @@ endif
 GEN_LIB_PATH = $(PUREGEV_ROOT)/lib/genicam/bin/Linux64_x64
 LDFLAGS      += -L$(GEN_LIB_PATH)
 
-
 # Configure Qt compilation if any
 SRC_MOC              =
 MOC			         =
 RCC					 =
-FILES_QTGUI          = $(shell grep -l --exclude=Makefile Q_OBJECT *)
-$(info $$var is [${FILES_QTGUI}])
-
+FILES_QTGUI          = $(shell grep -l -d skip --exclude=Makefile Q_OBJECT *)
 
 ifneq ($(wildcard /etc/redhat-release),)
     QMAKE = qmake-qt5
@@ -130,30 +129,35 @@ endif
 LD_LIBRARY_PATH       = $(PV_LIBRARY_PATH):$(QT_LIBRARY_PATH):$(GEN_LIB_PATH)
 export LD_LIBRARY_PATH
 
-OBJS      += $(SRC_CPPS:%.cpp=%.o)
-OBJS      += $(SRC_CS:%.c=%.o)
+OBJS      += $(SRC_CPPS:$(SRC_DIR)/%.cpp=$(BUILD_DIR)/%.o)
+OBJS      += $(SRC_CS:$(SRC_DIR)/%.c=$(BUILD_DIR)/%.o)
 
 all: $(EXEC)
 
 clean:
-	rm -rf $(OBJS) $(EXEC) $(SRC_MOC) $(SRC_QRC)
+	rm -rf $(SRC_MOC) $(SRC_QRC)
+	@$(RM) -rv $(BUILD_DIR) # The @ disables the echoing of the command
 
 moc_%.cxx: %.h
-	$(MOC) $< -o $@ 
+	$(MOC) $< -o $@
 
 qrc_%.cxx: %.qrc
 	$(RCC) $< -o $@
 
-%.o: %.cxx
+$(BUILD_DIR)/%.o: $(SRC_DIR)/%.cxx
 	$(CXX) -c $(CPPFLAGS) -o $@ $<
 
-%.o: %.cpp
+$(BUILD_DIR)/%.o: $(SRC_DIR)/%.cpp
 	$(CXX) -c $(CPPFLAGS) -o $@ $<
 
-%.o: %.c
+$(BUILD_DIR)/%.o: $(SRC_DIR)/%.c
 	$(CC) -c $(CFLAGS) -o $@ $<
 
-$(EXEC): $(OBJS)
+$(BUILD_DIR):
+	mkdir -p $@
+
+$(EXEC): $(BUILD_DIR) $(OBJS)
 	$(CXX) $(OBJS) -o $@ $(LDFLAGS) 
+
 
 .PHONY: all clean
