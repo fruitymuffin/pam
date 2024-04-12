@@ -82,7 +82,7 @@ LDFLAGS      += -L$(GEN_LIB_PATH)
 SRC_MOC              =
 MOC			         =
 RCC					 =
-FILES_QTGUI          = $(shell grep -l -d skip --exclude=Makefile Q_OBJECT *)
+FILES_QTGUI          = $(shell grep -l -r Q_OBJECT $(SRC_DIR)/)
 
 ifneq ($(wildcard /etc/redhat-release),)
     QMAKE = qmake-qt5
@@ -112,14 +112,15 @@ ifneq ($(FILES_QTGUI),)
 
     QT_LIBRARY_PATH   = $(QT_SDK_LIB)
 
-    FILES_MOC            = $(shell grep -l Q_OBJECT *)
+    FILES_MOC             = $(notdir $(shell grep -l -r Q_OBJECT $(SRC_DIR)/))
     ifneq ($(FILES_MOC),)
-	    SRC_MOC           = $(FILES_MOC:%h=moc_%cxx)
-	    FILES_QRC         = $(shell ls *.qrc)
-	    SRC_QRC           = $(FILES_QRC:%qrc=qrc_%cxx)
+    	SRC_MOC          := $(addprefix $(SRC_DIR)/, $(FILES_MOC:%h=moc_%cxx))
 
-	    OBJS             += $(SRC_MOC:%.cxx=%.o)
-	    OBJS		     += $(SRC_QRC:%.cxx=%.o)
+    	FILES_QRC         = $(notdir $(shell ls $(SRC_DIR)/*.qrc))
+    	SRC_QRC          := $(addprefix $(SRC_DIR)/, $(FILES_QRC:%qrc=qrc_%cxx))
+
+	    OBJS             += $(SRC_MOC:$(SRC_DIR)/%.cxx=$(BUILD_DIR)/%.o)
+	    OBJS		     += $(SRC_QRC:$(SRC_DIR)/%.cxx=$(BUILD_DIR)/%.o)
 
         MOC               = $(QT_SDK_BIN)/moc
   	    RCC               = $(QT_SDK_BIN)/rcc
@@ -132,11 +133,18 @@ export LD_LIBRARY_PATH
 OBJS      += $(SRC_CPPS:$(SRC_DIR)/%.cpp=$(BUILD_DIR)/%.o)
 OBJS      += $(SRC_CS:$(SRC_DIR)/%.c=$(BUILD_DIR)/%.o)
 
+# Make a .d file for each .o
+DEPS = $(OBJS:%.o=%.d)
+
+
+
+$(info OBJS is $(OBJS))
+
 all: $(EXEC)
 
 clean:
 	rm -rf $(SRC_MOC) $(SRC_QRC)
-	@$(RM) -rv $(BUILD_DIR) # The @ disables the echoing of the command
+	@$(RM) -rv $(BUILD_DIR)
 
 moc_%.cxx: %.h
 	$(MOC) $< -o $@
@@ -145,13 +153,13 @@ qrc_%.cxx: %.qrc
 	$(RCC) $< -o $@
 
 $(BUILD_DIR)/%.o: $(SRC_DIR)/%.cxx
-	$(CXX) -c $(CPPFLAGS) -o $@ $<
+	$(CXX) -MMD -c $(CPPFLAGS) -o $@ $<
 
 $(BUILD_DIR)/%.o: $(SRC_DIR)/%.cpp
-	$(CXX) -c $(CPPFLAGS) -o $@ $<
+	$(CXX) -MMD -c $(CPPFLAGS) -o $@ $<
 
 $(BUILD_DIR)/%.o: $(SRC_DIR)/%.c
-	$(CC) -c $(CFLAGS) -o $@ $<
+	$(CC) -MMD -c $(CFLAGS) -o $@ $<
 
 $(BUILD_DIR):
 	mkdir -p $@
@@ -159,5 +167,7 @@ $(BUILD_DIR):
 $(EXEC): $(BUILD_DIR) $(OBJS)
 	$(CXX) $(OBJS) -o $@ $(LDFLAGS) 
 
+# Include all .d files
+-include $(DEPS)
 
 .PHONY: all clean

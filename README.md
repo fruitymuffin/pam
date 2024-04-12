@@ -21,3 +21,16 @@ cd ~/pam/src
 make
 ```
 Alternatively it can be run via the build.sh script, which sources the relevant environment variables first.
+
+## 3. Running
+Run the executable in the build/ directory with:
+```
+./build/pam
+```
+
+## 4. Extras
+The eBUS SDK suggests enabling jumbo network frames for best performance. Assuming the camera is connected to network adapter enps20, this is done by.
+```
+sudo ip link set enp2s0 mtu 9000
+```
+Where 9000 indicates a 9000 byte frame.
