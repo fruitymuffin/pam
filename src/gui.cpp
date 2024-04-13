@@ -1,19 +1,25 @@
 #include "gui.h"
 
 #include <QLabel>
-#include <QLineEdit>
+#include <QSizePolicy>
 
 
 Gui::Gui(QWidget *parent)
     : QWidget(parent), display_wnd(nullptr)
 {
-    // Set window to be maximised
-    setWindowState(Qt::WindowMaximized);
+    // Set window size
+    //setWindowState(Qt::WindowMaximized);
+    setFixedSize(480, 320);
 
     display_wnd = new PvDisplayWnd;
 
     // Create the window layout
     createLayout();
+
+    if(receiver.isConnected())
+    {
+        updateParameters();
+    }
 }
 
 void Gui::createLayout()
@@ -34,14 +40,26 @@ void Gui::createLayout()
 
     QHBoxLayout* main_layout = new QHBoxLayout(this);
 
-    QVBoxLayout* menu_layout = createMenu();
-    main_layout->addLayout(menu_layout, Qt::AlignLeft );
+    main_layout->addLayout(createMenu(), Qt::AlignLeft );
     main_layout->addWidget(display_wnd->GetQWidget());
+    main_layout->setStretch(0, 2);
+    main_layout->setStretch(1, 5);
 }
 
 void Gui::createDisplay()
 {
     // Create some sort of display widget/context for outputting images
+}
+
+void Gui::updateParameters()
+{
+    DeviceParams dp = receiver.getDeviceParams();
+    // When updating the display fields, if any edits were made
+    name_field->setText(QString::fromStdString(dp.name));
+    ip_field->setText(QString::fromStdString(dp.ip));
+    mac_field->setText(QString::fromStdString(dp.mac));
+    gain_field->setText(QString::fromStdString(dp.gain));
+    m_exp_field->setText(QString::fromStdString(dp.exposure));
 }
 
 QVBoxLayout* Gui::createMenu()
@@ -53,29 +71,54 @@ QVBoxLayout* Gui::createMenu()
     // |_____|_____|
     // |_____|_____|
 
+    // Parameter field Device
+    QLabel* name_label = new QLabel(tr( "Name" ));
+    name_field = new QLineEdit;
+    name_field->setReadOnly( true );
+    name_field->setEnabled( false );
 
-    // Parameter field Test
-    QLabel* ip_label = new QLabel(tr( "IP Address" ));
-    QLineEdit* ip_field = new QLineEdit;
+    // Parameter field IP
+    QLabel* ip_label = new QLabel(tr( "IP" ));
+    ip_field = new QLineEdit;
     ip_field->setReadOnly( true );
     ip_field->setEnabled( false );
 
-    // Parameter field Test
-    QLabel* mac_label = new QLabel(tr( "MAC Address" ));
-    QLineEdit* mac_field = new QLineEdit;
+    // Parameter field MAC
+    QLabel* mac_label = new QLabel(tr( "MAC" ));
+    mac_field = new QLineEdit;
     mac_field->setReadOnly( true );
     mac_field->setEnabled( false );
+
+    // Parameter field gain
+    QLabel* gain_label = new QLabel(tr( "Gain" ));
+    gain_field = new QLineEdit;
+    gain_field->setReadOnly( true );
+    gain_field->setEnabled( false );
+
+    // Parameter field Measuring Exposure
+    QLabel* m_exp_label = new QLabel(tr( "Meas Exp (us)" ));
+    m_exp_field = new QLineEdit;
+    m_exp_field->setReadOnly( true );
+    m_exp_field->setEnabled( false );
 
     // Add fields to grid
     int row = 0;
     QGridLayout* grid_layout = new QGridLayout;
-    grid_layout->addWidget(ip_label, row, 0);
-    grid_layout->addWidget(ip_field, row, 1); row++;
-    grid_layout->addWidget(mac_label, row, 0);
-    grid_layout->addWidget(mac_field, row, 1);
+    grid_layout->addWidget(name_label, row, 0); row++;
+    grid_layout->addWidget(name_field, row, 0); row++;
+    grid_layout->addWidget(ip_label, row, 0); row++;
+    grid_layout->addWidget(ip_field, row, 0); row++;
+    grid_layout->addWidget(mac_label, row, 0); row++;
+    grid_layout->addWidget(mac_field, row, 0); row++;
+    grid_layout->addWidget(gain_label, row, 0); row++;
+    grid_layout->addWidget(gain_field, row, 0); row++;
+    grid_layout->addWidget(m_exp_label, row, 0); row++;
+    grid_layout->addWidget(m_exp_field, row, 0);
 
     QVBoxLayout* menu_layout = new QVBoxLayout;
     menu_layout->addLayout(grid_layout);
+
+    // Stretch element at the bottom of the layout files the remaining vertical space
     menu_layout->addStretch();
 
     return menu_layout;

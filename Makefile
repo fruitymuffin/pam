@@ -9,6 +9,7 @@ SRC_DIR := src
 
 SRC_CPPS := $(wildcard $(SRC_DIR)/*.cpp)
 EXEC     := $(BUILD_DIR)/pam
+TEST     := $(BUILD_DIR)/test
 
 # Checks if source files exist
 ifeq ($(SRC_CS) $(SRC_CPPS),)
@@ -165,7 +166,7 @@ $(BUILD_DIR):
 	mkdir -p $@
 
 $(EXEC): $(BUILD_DIR) $(OBJS)
-	$(CXX) $(OBJS) -o $@ $(LDFLAGS) 
+	$(CXX) $(OBJS) -o $@ $(LDFLAGS)
 
 # Include all .d files
 -include $(DEPS)

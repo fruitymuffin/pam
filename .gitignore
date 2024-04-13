@@ -34,3 +34,4 @@
 # Extras
 build/
 .vscode/
+*.cxx

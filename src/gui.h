@@ -10,7 +10,7 @@
 
 // Qt5
 #include <QWidget>
-#include <QPushButton>
+#include <QLineEdit>
 #include <QVBoxLayout>
 
 // eBUS SDK
@@ -18,6 +18,8 @@
 
 // project
 #include "receiver.h"
+
+#define MENU_WIDTH 120
 
 class Gui : public QWidget
 {
@@ -27,16 +29,26 @@ class Gui : public QWidget
         explicit Gui(QWidget *parent = 0);
         void createLayout();
     private:
-        // GRAPHICAL ELEMENTS FOR UI
+        // Ui element functions
         QVBoxLayout* createMenu();
         void createDisplay();
+        void updateParameters();
+
+    private:
+        // Ui element variables
+        QLineEdit* name_field;
+        QLineEdit* ip_field;
+        QLineEdit* mac_field;
+        QLineEdit* gain_field;
+        QLineEdit* m_exp_field;
 
         // PvDisplayWnd is an interface for displaying images
         PvDisplayWnd* display_wnd;
-        
 
         // RECIEVER CLASS
-        // Receiver receiver;
+        Receiver receiver;
+        
+        bool init = false;
 
 };
 

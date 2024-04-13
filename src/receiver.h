@@ -40,23 +40,42 @@
 // Typedefs
 typedef std::list<PvBuffer *> BufferList;
 
+struct DeviceParams
+{
+    std::string name;
+    std::string ip;
+    std::string mac;
+    std::string gain;
+    std::string exposure;
+};
+
 // Receiver
 class Receiver
 {
     public:
         Receiver();
+        ~Receiver();
         
         // Pulic functions
+        bool isConnected();
         bool selectDevice();
         bool openStream();
         bool connectToDevice();
+        void configureStream();
+        void acquireImages();
+        void createStreamBuffers();
+        void freeStreamBuffers();
+        bool DumpGenParameterArray(PvGenParameterArray *aArray );
+        bool getDeviceSettings();
+        DeviceParams getDeviceParams();
 
     private:
         // Reciever will own a device, connection, stream and pipeline
         PvString connection_id;
         PvDevice* device;
         PvStream* stream;
-        BufferList buffers;   
+        BufferList buffers;
+        DeviceParams device_params;
 };
 
 
