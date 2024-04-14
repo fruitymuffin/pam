@@ -14,6 +14,19 @@ Before compiling any programs which link the eBUS libraries source the relevant 
 source /opt/jai/ebus_sdk/Ubuntu-22.04-x86_64/bin/set_puregev_env.sh
 ```
 
+NOTE - the performance of the camera was found to be significantly better when using the eBUS Universal Pro Driver. It is installed with the eBUS SDK. If the linux kernel is updated during routine updates the driver needs to be rebuilt.
+To rebuild the driver:
+```
+cd /opt/jai/ebus_sdk/Ubuntu-22.04-x86_64/modules/
+sudo ./build.sh
+sudo ./install.sh --install
+```
+
+To check the status of the driver use:
+```
+./ebdriverlauncher.sh status
+```
+
 ## 2. Compiling
 The application can be compiled via make from the src/ directory, assuming all required environment variables are already sourced in the current terminal.
 ```
@@ -34,3 +47,7 @@ The eBUS SDK suggests enabling jumbo network frames for best performance. Assumi
 sudo ip link set enp2s0 mtu 9000
 ```
 Where 9000 indicates a 9000 byte frame.
+
+## 5. Application
+1. The aqcuisition rate of the camera is an attribute that can be changed. However, actual received FPS may be different from the selected acquisition rate. The actual frame rate can be improved by reducing the image width/height settings which allows much higher frame rates. Changing the height/width does not scale the image but crops it.
+2. For low light applications, the pixel binning option can improve the camera sensitivity significanly. The outcome is a brighter image at half the resolution and a greater possible frame rate.

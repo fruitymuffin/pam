@@ -42,11 +42,14 @@ class Gui : public QWidget
         QLineEdit* gain_field;
         QLineEdit* m_exp_field;
 
+        // The display widget is the container widget of the image display
+        QWidget* display_widget;
+
         // PvDisplayWnd is an interface for displaying images
         PvDisplayWnd* display_wnd;
 
         // RECIEVER CLASS
-        Receiver receiver;
+        Receiver* receiver;
         
         bool init = false;
 

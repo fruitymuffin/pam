@@ -2,7 +2,12 @@
 #include "stringtools.h"
 #include <PvDecompressionFilter.h>
 
-Receiver::Receiver()
+Receiver::Receiver(PvDisplayWnd* _display_wnd) :
+    display_wnd(_display_wnd),
+    device(nullptr),
+    stream(nullptr),
+    pipeline(nullptr),
+    display_thread(nullptr)
 {
     if (selectDevice() )
     {
@@ -13,15 +18,22 @@ Receiver::Receiver()
             if (stream != NULL)
             {
                 configureStream();
-                createStreamBuffers();
+                device->StreamEnable();
 
-                //acquireImages(device, stream);
-                getDeviceSettings();
+                PvGenParameterArray* params = device->GetParameters();
+                PvGenCommand *start_cmd = dynamic_cast<PvGenCommand *>( params->Get( "AcquisitionStart" ) );
+                start_cmd->Execute();
+
+                display_thread = new DisplayThread(display_wnd);
+                
+
+                pipeline = new PvPipeline(stream);
+                
+                display_thread->Start(pipeline, params);
+                pipeline->Start();
+
+                display_thread->SetPriority(50);
             }
-
-            
-            stream->Close();
-            PvStream::Free(stream); 
         }
     }
 }
@@ -61,6 +73,8 @@ DeviceParams Receiver::getDeviceParams()
 
 Receiver::~Receiver()
 {
+    stream->Close();
+    PvStream::Free(stream); 
     device->Disconnect();
     PvDevice::Free(device);
 }

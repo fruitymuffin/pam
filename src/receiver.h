@@ -27,6 +27,11 @@
 #include <PvStream.h>
 #include <PvStreamGEV.h>
 #include <PvBuffer.h>
+#include <PvPipeline.h>
+#include <PvDisplayWnd.h>
+
+// project
+#include "displaythread.h"
 
 // Default software-side params
 #define DEFAULT_BUFFER_COUNT 4
@@ -53,7 +58,7 @@ struct DeviceParams
 class Receiver
 {
     public:
-        Receiver();
+        Receiver(PvDisplayWnd* _display_wnd);
         ~Receiver();
         
         // Pulic functions
@@ -74,7 +79,10 @@ class Receiver
         PvString connection_id;
         PvDevice* device;
         PvStream* stream;
+        PvPipeline* pipeline;
         BufferList buffers;
+        PvDisplayWnd* display_wnd;
+        DisplayThread* display_thread;
         DeviceParams device_params;
 };
 

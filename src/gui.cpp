@@ -5,18 +5,23 @@
 
 
 Gui::Gui(QWidget *parent)
-    : QWidget(parent), display_wnd(nullptr)
+    : QWidget(parent), display_wnd(nullptr), display_widget(nullptr)
 {
+    // Create display adapter
+    display_wnd = new PvDisplayWnd;
+    display_wnd->SetBackgroundColor(255, 200, 255);
+    receiver = new Receiver(display_wnd);
+    display_widget = new QWidget();
+    display_wnd->Create(display_widget);
+    // Create the window layout
+    createLayout();
+
+    
     // Set window size
     //setWindowState(Qt::WindowMaximized);
     setFixedSize(480, 320);
 
-    display_wnd = new PvDisplayWnd;
-
-    // Create the window layout
-    createLayout();
-
-    if(receiver.isConnected())
+    if(receiver->isConnected())
     {
         updateParameters();
     }
@@ -41,7 +46,7 @@ void Gui::createLayout()
     QHBoxLayout* main_layout = new QHBoxLayout(this);
 
     main_layout->addLayout(createMenu(), Qt::AlignLeft );
-    main_layout->addWidget(display_wnd->GetQWidget());
+    main_layout->addWidget(display_widget);
     main_layout->setStretch(0, 2);
     main_layout->setStretch(1, 5);
 }
@@ -53,7 +58,7 @@ void Gui::createDisplay()
 
 void Gui::updateParameters()
 {
-    DeviceParams dp = receiver.getDeviceParams();
+    DeviceParams dp = receiver->getDeviceParams();
     // When updating the display fields, if any edits were made
     name_field->setText(QString::fromStdString(dp.name));
     ip_field->setText(QString::fromStdString(dp.ip));
