@@ -35,3 +35,8 @@
 build/
 .vscode/
 *.cxx
+*.gbr
+*.drl
+.vs/
+Debug/
+Release/
