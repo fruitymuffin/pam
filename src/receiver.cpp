@@ -39,6 +39,14 @@ Receiver::Receiver(PvDisplayWnd* _display_wnd) :
     }
 }
 
+Receiver::~Receiver()
+{
+    stream->Close();
+    PvStream::Free(stream); 
+    device->Disconnect();
+    PvDevice::Free(device);
+}
+
 DeviceParams Receiver::getDeviceParams()
 {
     // If the camera is connected
@@ -67,18 +75,20 @@ DeviceParams Receiver::getDeviceParams()
 
         params->GetFloat("ExposureTime")->GetValue(val_float);
         device_params.exposure = StringTools::doubleToString(val_float);
+
+        params->GetInteger("BinningHorizontal")->GetValue(val_int);
+        device_params.binning = std::to_string(val_int);
+
+        params->GetInteger("Width")->GetValue(val_int);
+        device_params.width = std::to_string(val_int);
+
+        params->GetInteger("Height")->GetValue(val_int);
+        device_params.height = std::to_string(val_int);
     }
 
     return device_params;
 }
 
-Receiver::~Receiver()
-{
-    stream->Close();
-    PvStream::Free(stream); 
-    device->Disconnect();
-    PvDevice::Free(device);
-}
 
 bool Receiver::isConnected()
 {
@@ -200,6 +210,8 @@ void Receiver::stopAcquisition()
 
 void Receiver::startAcquisition()
 {
+    resetStream();
+
     PvGenCommand *cmd = dynamic_cast<PvGenCommand *>( params->Get( "AcquisitionStart" ) );
 
     // Send start acquisition command
@@ -255,119 +267,15 @@ void Receiver::freeStreamBuffers()
     buffers.clear();
 }
 
-bool Receiver::DumpGenParameterArray( PvGenParameterArray *aArray )
-{
-    // Getting array size
-    uint32_t lParameterArrayCount = aArray->GetCount();
-    std::cout << std::endl;
-    std::cout << "Array has " << lParameterArrayCount << " parameters" << std::endl;
-
-    // Traverse through Array and print out parameters available.
-    for( uint32_t x = 0; x < lParameterArrayCount; x++ )
-    {
-        // Get a parameter
-        PvGenParameter *lGenParameter = aArray->Get( x );
-
-        // Don't show invisible parameters - display everything up to Guru.
-        if ( !lGenParameter->IsVisible( PvGenVisibilityGuru ) )
-        {
-            continue;
-        }
-
-        // Get and print parameter's name.
-        PvString lGenParameterName, lCategory;
-        lGenParameter->GetCategory( lCategory );
-        lGenParameter->GetName( lGenParameterName );
-        std::cout << lCategory.GetAscii() << ":" << lGenParameterName.GetAscii() << ", ";
-
-        // Parameter available?
-        if ( !lGenParameter->IsAvailable() )
-        {
-            std::cout << "{Not Available}" << std::endl;
-            continue;
-        }
-
-        // Parameter readable?
-        if ( !lGenParameter->IsReadable() )
-        {
-            std::cout << "{Not readable}" << std::endl;
-            continue;
-        }
-        
-        // Get the parameter type
-        PvGenType lType;
-        lGenParameter->GetType( lType );
-        switch ( lType )
-        {
-            case PvGenTypeInteger:
-                {
-                    int64_t lValue;             
-                    static_cast<PvGenInteger *>( lGenParameter )->GetValue( lValue );
-                    std::cout << "Integer: " << lValue;
-                }
-                break;
-            
-            case PvGenTypeEnum:
-                {
-                    PvString lValue;                
-                    static_cast<PvGenEnum *>( lGenParameter )->GetValue( lValue );
-                    std::cout << "Enum: " << lValue.GetAscii();
-                }
-                break;
-            
-            case PvGenTypeBoolean:
-                {
-                    bool lValue;                
-                    static_cast<PvGenBoolean *>( lGenParameter )->GetValue( lValue );
-                    if( lValue ) 
-                    {
-                        std::cout << "Boolean: TRUE";
-                    }
-                    else 
-                    {
-                        std::cout << "Boolean: FALSE";
-                    }
-                }
-                break;
-
-            case PvGenTypeString:
-                {
-                    PvString lValue;
-                    static_cast<PvGenString *>( lGenParameter )->GetValue( lValue );
-                    std::cout << "String: " << lValue.GetAscii();
-                }
-                break;
-
-            case PvGenTypeCommand:
-                std::cout << "Command";
-                break;
-
-            case PvGenTypeFloat:
-                {
-                    double lValue;              
-                    static_cast<PvGenFloat *>( lGenParameter )->GetValue( lValue );
-                    std::cout << "Float: " << lValue;
-                }
-                break;
-                
-            default:
-                // Unexpected
-                break;
-        }
-        std::cout << std::endl;
-    }
-
-    return true;
-}
-
-/// @brief Change camera params to multiframe mode and enable the trigger on line 5 for manual timing
-
-/// @param n Number of frames
 void Receiver::startTriggeredMultiframe(int n)
 {
+    stopAcquisition();
     // Settings to apply are acquisition mode and trigger enable
     PvGenEnum *cmd = dynamic_cast<PvGenEnum *>( params->Get( "AcquisitionMode" ) );
     cmd->SetValue("MultiFrame");
+
+    cmd = dynamic_cast<PvGenEnum*>(params->Get("TriggerMode"));
+    cmd->SetValue("On");
 
     //cmd = dynamic_cast<PvGenCommand *>( params->Get( "" ) );
 
@@ -395,7 +303,6 @@ void Receiver::toggleBinning()
     }
 
     device->StreamEnable();
-    resetStream();
     startAcquisition();
 }
 
@@ -409,5 +316,5 @@ void Receiver::resetStream()
     }
 
     pipeline->Reset();
-    display_thread->ResetStatistics();
 }
+

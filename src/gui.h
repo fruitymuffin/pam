@@ -46,6 +46,9 @@ class Gui : public QWidget
         QLineEdit* mac_field;
         QLineEdit* gain_field;
         QLineEdit* m_exp_field;
+        QLineEdit* bin_field;
+        QLineEdit* width_field;
+        QLineEdit* height_field;
 
         // The display widget is the container widget of the image display
         QWidget* display_widget;

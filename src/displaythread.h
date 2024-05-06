@@ -13,11 +13,14 @@
 
 #include <PvDisplayThread.h>
 #include <PvDisplayWnd.h>
+#include <PvBufferWriter.h>
 
 class DisplayThread : public PvDisplayThread
 {
     public:
         DisplayThread(PvDisplayWnd* _display_wnd);
+        void setSaving(const bool& save);
+        std::string getFileName();
 
     protected:
         // Implement PvDisplayThread callbacks
@@ -28,6 +31,10 @@ class DisplayThread : public PvDisplayThread
 
     private:
         PvDisplayWnd* display_wnd;
+        PvBufferWriter* buffer_writer;
+
+        bool is_saving;
+        unsigned int sequence;
 };
 
 

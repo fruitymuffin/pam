@@ -52,6 +52,9 @@ struct DeviceParams
     std::string mac;
     std::string gain;
     std::string exposure;
+    std::string binning;
+    std::string width;
+    std::string height;
 };
 
 // Receiver

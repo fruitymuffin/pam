@@ -65,6 +65,9 @@ void Gui::updateParameters()
     mac_field->setText(QString::fromStdString(dp.mac));
     gain_field->setText(QString::fromStdString(dp.gain));
     m_exp_field->setText(QString::fromStdString(dp.exposure));
+    bin_field->setText(QString::fromStdString(dp.binning));
+    width_field->setText(QString::fromStdString(dp.width));
+    height_field->setText(QString::fromStdString(dp.height));
 }
 
 QVBoxLayout* Gui::createMenu()
@@ -106,6 +109,21 @@ QVBoxLayout* Gui::createMenu()
     m_exp_field->setReadOnly( true );
     m_exp_field->setEnabled( false );
 
+    QLabel* bin_label = new QLabel(tr( "Pixel Binning" ));
+    bin_field = new QLineEdit;
+    bin_field->setReadOnly( false );
+    bin_field->setEnabled( false );
+
+    QLabel* width_label = new QLabel(tr( "Width" ));
+    width_field = new QLineEdit;
+    width_field->setReadOnly( true );
+    width_field->setEnabled( false );
+
+    QLabel* height_label = new QLabel(tr( "Height" ));
+    height_field = new QLineEdit;
+    height_field->setReadOnly( true );
+    height_field->setEnabled( false );
+
     // Add fields to grid
     int row = 0;
     QGridLayout* grid_layout = new QGridLayout;
@@ -118,7 +136,13 @@ QVBoxLayout* Gui::createMenu()
     grid_layout->addWidget(gain_label, row, 0); row++;
     grid_layout->addWidget(gain_field, row, 0); row++;
     grid_layout->addWidget(m_exp_label, row, 0); row++;
-    grid_layout->addWidget(m_exp_field, row, 0);
+    grid_layout->addWidget(m_exp_field, row, 0); row++;
+    grid_layout->addWidget(bin_label, row, 0); row++;
+    grid_layout->addWidget(bin_field, row, 0); row++;
+    grid_layout->addWidget(width_label, row, 0); row++;
+    grid_layout->addWidget(width_field, row, 0); row++;
+    grid_layout->addWidget(height_label, row, 0); row++;
+    grid_layout->addWidget(height_field, row, 0);
 
     QVBoxLayout* menu_layout = new QVBoxLayout;
     menu_layout->addLayout(grid_layout);
