@@ -72,6 +72,12 @@ class Receiver
         void freeStreamBuffers();
         bool DumpGenParameterArray(PvGenParameterArray *aArray );
         bool getDeviceSettings();
+        void startAcquisition();
+        void stopAcquisition();
+        bool isAcquiring();
+        void startTriggeredMultiframe(int n);
+        void toggleBinning();
+        void resetStream();
         DeviceParams getDeviceParams();
 
     private:
@@ -83,7 +89,10 @@ class Receiver
         BufferList buffers;
         PvDisplayWnd* display_wnd;
         DisplayThread* display_thread;
-        DeviceParams device_params;
+        PvGenParameterArray* params;    // Actual device params
+        DeviceParams device_params;     // Struct with some params for populating gui
+
+        bool acquiring;
 };
 
 

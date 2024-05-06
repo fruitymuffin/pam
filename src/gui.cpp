@@ -19,7 +19,7 @@ Gui::Gui(QWidget *parent)
     
     // Set window size
     //setWindowState(Qt::WindowMaximized);
-    setFixedSize(480, 320);
+    setFixedSize(720, 480);
 
     if(receiver->isConnected())
     {
@@ -127,4 +127,34 @@ QVBoxLayout* Gui::createMenu()
     menu_layout->addStretch();
 
     return menu_layout;
+}
+
+// Keypress event
+void Gui::keyPressEvent(QKeyEvent* event)
+{
+    switch(event->key())
+    {
+        case Qt::Key_Space:
+            // start/stop stream
+            if (receiver->isConnected())
+            {
+                if (receiver->isAcquiring())
+                {
+                    receiver->stopAcquisition();
+                }
+                else
+                {
+                    receiver->startAcquisition();
+                }
+
+            }
+            break;
+
+        case Qt::Key_B:
+            if (receiver->isConnected())
+            {
+                receiver->toggleBinning();
+            }
+            break;
+    }
 }

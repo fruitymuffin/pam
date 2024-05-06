@@ -12,6 +12,7 @@
 #include <QWidget>
 #include <QLineEdit>
 #include <QVBoxLayout>
+#include <QKeyEvent>
 
 // eBUS SDK
 #include <PvDisplayWnd.h>
@@ -28,6 +29,10 @@ class Gui : public QWidget
     public:
         explicit Gui(QWidget *parent = 0);
         void createLayout();
+
+    protected:
+        void keyPressEvent(QKeyEvent* event) override;
+
     private:
         // Ui element functions
         QVBoxLayout* createMenu();

@@ -40,14 +40,13 @@ Run the executable in the build/ directory with:
 ./build/pam
 ```
 
-## 4. Extras
 The eBUS SDK suggests enabling jumbo network frames for best performance. Assuming the camera is connected to network adapter enps20, this is done by.
 ```
 sudo ip link set enp2s0 mtu 9000
 ```
 Where 9000 indicates a 9000 byte frame.
 
-## 5. Application
+## 4. Notes
 1. The aqcuisition rate of the camera is an attribute that can be changed. However, actual received FPS may be different from the selected acquisition rate. The actual frame rate can be improved by reducing the image width/height settings which allows much higher frame rates. Changing the height/width does not scale the image but crops it.
 2. For low light applications, the pixel binning option can improve the camera sensitivity significanly. The outcome is a brighter image at half the resolution and a greater possible frame rate.
 
@@ -79,3 +78,22 @@ In order to set fuses with avrdude on the newer DA series chips, it was necessar
 ```
 avrdude -c serialupdi -p avr64da32 -P com5 -U syscfg0:w:0xC8:m
 ```
+
+## 3. Serial communication
+The avr controller has a FTDI 230XS usb to serial chip. Which will typically show up as /dev/ttyUSBn on linux. To write to the port, we can open it as a file using fopen, however to do so we need to know which tty port our device is on. The device is not guaranteed to always be /dev/ttyUSB0.
+To be able to access it consistently we can create a symlink to a known filename by creating a udev rule.
+
+Create a file caled "N-my-rule.rules" in ```/etc/udev/rules.d/``` with the contents:
+```
+SUBSYSTEM=="tty", ATTRS{idVendor}=="0403", ATTRS{idProduct}=="6015", ATTRS{serial}=="DU0D13LG", SYMLINK+="ttypam-serial"
+```
+
+This creates a symlink called ```ttypam-serial``` to the tty port which matches the properties given (idVendor, idProduct, serial), so that we can now use ```/dev/ttypam-serial``` to access our device.
+
+To get the required USB device info use:
+```
+udevadm info -a -n /dev/ttyUSB0 | grep '{serial}\|{idProduct}\|{idVendor}' | head -n3
+```
+Where ttyUSB0 is replaced with the tty port of the device. See ```lsusb```.
+
+It might also be necessary to add the user to the dialout group to get permissions to usb devices.

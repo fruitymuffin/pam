@@ -1,26 +1,27 @@
 
 BUILD_DIR := build
-EXEC      := test.exe
-
 
 CXX       := g++
 CPPFLAGS  := -std=c++14 -O3 -Wall -MMD
-LDFLAGS   := 
+CPPFLAGS  += -I/usr/local/include/libusb-1.0 
+LDFLAGS   := /usr/local/lib/libusb-1.0.a -ludev
 
 # Files
 SRCS := $(wildcard *.cpp)
 OBJS := $(SRCS:%.cpp=$(BUILD_DIR)/%.o)
+OBJ   = $(patsubst %.out,%.o,$@)
+EXES := $(OBJS:%.o=%.out)
 DEPS      := $(OBJS:$.o=$.d)
 
 # General targets
-all: $(BUILD_DIR)/$(EXEC)
+all: $(EXES)
 
 clean:
 	rm -rf $(BUILD_DIR)
 
-# Specific targets
-$(BUILD_DIR)/$(EXEC): $(BUILD_DIR) $(OBJS)
-	$(CXX) $(OBJS) -o $@ $(LDFLAGS)
+# Build each cpp file into an exe
+$(EXES): $(BUILD_DIR) $(OBJS)
+	$(CXX) $(OBJ) -o $@ $(LDFLAGS)
 
 $(BUILD_DIR)/%.o: %.cpp
 	$(CXX) -c $(CPPFLAGS) -o $@ $<

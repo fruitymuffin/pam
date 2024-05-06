@@ -7,31 +7,32 @@ Receiver::Receiver(PvDisplayWnd* _display_wnd) :
     device(nullptr),
     stream(nullptr),
     pipeline(nullptr),
-    display_thread(nullptr)
+    display_thread(nullptr),
+    params(nullptr)
 {
     if (selectDevice() )
     {
         connectToDevice();
         if (device != NULL)
         {
+            params = device->GetParameters();
             openStream();
             if (stream != NULL)
             {
                 configureStream();
                 device->StreamEnable();
 
-                PvGenParameterArray* params = device->GetParameters();
-                PvGenCommand *start_cmd = dynamic_cast<PvGenCommand *>( params->Get( "AcquisitionStart" ) );
-                start_cmd->Execute();
+                // Start image acquisition (continuous)
+                startAcquisition();
 
+                // Start the display thread/pipeline to put images on the screen
                 display_thread = new DisplayThread(display_wnd);
-                
-
                 pipeline = new PvPipeline(stream);
                 
                 display_thread->Start(pipeline, params);
                 pipeline->Start();
 
+                // Docs said to do this....I assume so that the thread gets time from OS?
                 display_thread->SetPriority(50);
             }
         }
@@ -45,7 +46,7 @@ DeviceParams Receiver::getDeviceParams()
     {
         // Get the device's parameters array. It is built from the 
         // GenICam XML file provided by the device itself.
-        PvGenParameterArray* params = device->GetParameters();
+        params = device->GetParameters();
 
         PvString val_str;
         int64_t val_int;
@@ -182,150 +183,29 @@ void Receiver::configureStream()
     }
 }
 
-void Receiver::acquireImages()
+bool Receiver::isAcquiring()
 {
-    // Get device parameters need to control streaming
-    PvGenParameterArray *lDeviceParams = device->GetParameters();
+    return acquiring;
+}
 
-    // Map the GenICam AcquisitionStart and AcquisitionStop commands
-    PvGenCommand *lStart = dynamic_cast<PvGenCommand *>( lDeviceParams->Get( "AcquisitionStart" ) );
-    PvGenCommand *lStop = dynamic_cast<PvGenCommand *>( lDeviceParams->Get( "AcquisitionStop" ) );
+void Receiver::stopAcquisition()
+{
+    PvGenCommand *cmd = dynamic_cast<PvGenCommand *>( params->Get( "AcquisitionStop" ) );
+    
+    // Send stop acquisition command
+    cmd->Execute();
 
-    // Get stream parameters
-    PvGenParameterArray *lStreamParams = stream->GetParameters();
+    acquiring = false;
+}
 
-    // Map a few GenICam stream stats counters
-    PvGenFloat *lFrameRate = dynamic_cast<PvGenFloat *>( lStreamParams->Get( "AcquisitionRate" ) );
-    PvGenFloat *lBandwidth = dynamic_cast<PvGenFloat *>( lStreamParams->Get( "Bandwidth" ) );
+void Receiver::startAcquisition()
+{
+    PvGenCommand *cmd = dynamic_cast<PvGenCommand *>( params->Get( "AcquisitionStart" ) );
 
-    // Enable streaming and send the AcquisitionStart command
-    device->StreamEnable();
-    lStart->Execute();
+    // Send start acquisition command
+    cmd->Execute();
 
-    char lDoodle[] = "|\\-|-/";
-    int lDoodleIndex = 0;
-    double lFrameRateVal = 0.0;
-    double lBandwidthVal = 0.0;
-    int lErrors = 0;
-
-    PvDecompressionFilter lDecompressionFilter;
-
-    // Acquire images until the user instructs us to stop.
-    std::cout << "Streaming started!" << std::endl;
-    while ( true)
-    {
-        PvBuffer *lBuffer = NULL;
-        PvResult lOperationResult;
-
-        // Retrieve next buffer
-        PvResult lResult = stream->RetrieveBuffer( &lBuffer, &lOperationResult, 1000 );
-        if ( lResult.IsOK() )
-        {
-            if ( lOperationResult.IsOK() )
-            {
-                //
-                // We now have a valid buffer. This is where you would typically process the buffer.
-                // -----------------------------------------------------------------------------------------
-                // ...
-
-                lFrameRate->GetValue( lFrameRateVal );
-                lBandwidth->GetValue( lBandwidthVal );
-
-                std::cout << std::fixed << std::setprecision( 1 );
-                std::cout << lDoodle[ lDoodleIndex ];
-                std::cout << " BlockID: " << std::uppercase << std::hex << std::setfill( '0' ) << std::setw( 16 ) << lBuffer->GetBlockID();
-
-                switch ( lBuffer->GetPayloadType() )
-                {
-                case PvPayloadTypeImage:
-                    std::cout << "  W: " << std::dec << lBuffer->GetImage()->GetWidth() << " H: " << lBuffer->GetImage()->GetHeight();
-                    break;
-
-                case PvPayloadTypeChunkData:
-                    std::cout << " Chunk Data payload type" << " with " << lBuffer->GetChunkCount() << " chunks";
-                    break;
-
-                case PvPayloadTypeRawData:
-                    std::cout << " Raw Data with " << lBuffer->GetRawData()->GetPayloadLength() << " bytes";
-                    break;
-
-                case PvPayloadTypeMultiPart:
-                    std::cout << " Multi Part with " << lBuffer->GetMultiPartContainer()->GetPartCount() << " parts";
-                    break;
-
-                case PvPayloadTypePleoraCompressed:
-                    {
-                        PvPixelType lPixelType = PvPixelUndefined;
-                        uint32_t lWidth = 0, lHeight = 0;
-                        PvDecompressionFilter::GetOutputFormatFor( lBuffer, lPixelType, lWidth, lHeight );
-                        uint32_t lCalculatedSize = PvImage::GetPixelSize( lPixelType ) * lWidth * lHeight / 8;
-
-                        PvBuffer lDecompressedBuffer;
-                        // If the buffer is compressed, start by decompressing it
-                        if ( lDecompressionFilter.IsCompressed( lBuffer ) )
-                        {
-                            lResult = lDecompressionFilter.Execute( lBuffer, &lDecompressedBuffer );
-                            if ( !lResult.IsOK() )
-                            {
-                                break;
-                            }
-                        }
-
-                        uint32_t lDecompressedSize = lDecompressedBuffer.GetSize();
-                        if ( lDecompressedSize!= lCalculatedSize )
-                        {
-                            lErrors++;
-                        }
-                        double lCompressionRatio = static_cast<double>( lDecompressedSize ) / static_cast<double>( lBuffer->GetAcquiredSize() );
-                        std::cout << std::dec << " Pleora compressed.   Compression Ratio " << lCompressionRatio;
-                        std::cout << " Errors: " << lErrors;
-                    }
-                    break;
-
-                default:
-                    std::cout << " Payload type not supported by this sample";
-                    break;
-                }
-                std::cout << "  " << lFrameRateVal << " FPS  " << ( lBandwidthVal / 1000000.0 ) << " Mb/s   \r";
-            }
-            else
-            {
-                // Non OK operational result
-                std::cout << lDoodle[ lDoodleIndex ] << " " << lOperationResult.GetCodeString().GetAscii() << "\r";
-            }
-
-            // Re-queue the buffer in the stream object
-            stream->QueueBuffer( lBuffer );
-        }
-        else
-        {
-            // Retrieve buffer failure
-            std::cout << lDoodle[ lDoodleIndex ] << " " << lResult.GetCodeString().GetAscii() << "\r";
-        }
-
-        ++lDoodleIndex %= 6;
-    }
-
-    std::cout << std::endl << std::endl;
-
-    // Tell the device to stop sending images.
-    std::cout << "Sending AcquisitionStop command to the device" << std::endl;
-    lStop->Execute();
-
-    // Disable streaming on the device
-    std::cout << "Disable streaming on the controller." << std::endl;
-    device->StreamDisable();
-
-    // Abort all buffers from the stream and dequeue
-    std::cout << "Aborting buffers still in stream" << std::endl;
-    stream->AbortQueuedBuffers();
-    while ( stream->GetQueuedBufferCount() > 0 )
-    {
-        PvBuffer *lBuffer = NULL;
-        PvResult lOperationResult;
-
-        stream->RetrieveBuffer( &lBuffer, &lOperationResult );
-    }
+    acquiring = true;
 }
 
 void Receiver::createStreamBuffers()
@@ -374,9 +254,6 @@ void Receiver::freeStreamBuffers()
     // Clear the buffer list 
     buffers.clear();
 }
-
-
-
 
 bool Receiver::DumpGenParameterArray( PvGenParameterArray *aArray )
 {
@@ -483,58 +360,54 @@ bool Receiver::DumpGenParameterArray( PvGenParameterArray *aArray )
     return true;
 }
 
-bool Receiver::getDeviceSettings()
+/// @brief Change camera params to multiframe mode and enable the trigger on line 5 for manual timing
+
+/// @param n Number of frames
+void Receiver::startTriggeredMultiframe(int n)
 {
-    if (device == NULL)
-    {
-        return false;
-    }
-    
-    // Get the device's parameters array. It is built from the 
-    // GenICam XML file provided by the device itself.
-    PvGenParameterArray* lParameters = device->GetParameters();
+    // Settings to apply are acquisition mode and trigger enable
+    PvGenEnum *cmd = dynamic_cast<PvGenEnum *>( params->Get( "AcquisitionMode" ) );
+    cmd->SetValue("MultiFrame");
 
-    // Dumping device's parameters array content.
-    DumpGenParameterArray( lParameters );
+    //cmd = dynamic_cast<PvGenCommand *>( params->Get( "" ) );
 
-    // Get width parameter - mandatory GigE Vision parameter, it should be there.
-    PvGenParameter *lParameter = lParameters->Get( "Width" );
-
-    // Converter generic parameter to width using dynamic cast. If the
-    // type is right, the conversion will work otherwise lWidth will be NULL.
-    PvGenInteger *lWidthParameter = dynamic_cast<PvGenInteger *>( lParameter );
-
-    if ( lWidthParameter == NULL )
-    {
-        std::cout << "Unable to get the width parameter." << std::endl;
-    }
-
-    // Read current width value.
-    int64_t lOriginalWidth = 0;
-    if ( !(lWidthParameter->GetValue( lOriginalWidth ).IsOK()) )
-    {
-        std::cout << "Error retrieving width from device" << std::endl;   
-    }
-
-    // Read max.
-    int64_t lMaxWidth = 0;
-    if ( !(lWidthParameter->GetMax( lMaxWidth ).IsOK()) )
-    {
-        std::cout << "Error retrieving width max from device" << std::endl;   
-    }
-
-    // Change width value.
-    if ( !lWidthParameter->SetValue( lMaxWidth ).IsOK() )
-    {
-        std::cout << "Error changing width on device - the device is on Read Only Mode, please change to Exclusive to change value" << std::endl; 
-    } 
-
-    // Reset width to original value.
-    if ( !lWidthParameter->SetValue( lOriginalWidth ).IsOK() )
-    {
-        std::cout << "Error changing width on device" << std::endl;   
-    }
-
-    return true;
 }
 
+void Receiver::toggleBinning()
+{
+    stopAcquisition();
+    device->StreamDisable();
+    // Read current binning param
+    PvGenInteger* bin_h = dynamic_cast<PvGenInteger *>(params->Get("BinningHorizontal"));
+    PvGenInteger* bin_v = dynamic_cast<PvGenInteger *>(params->Get("BinningVertical"));
+
+    int64_t val;
+    bin_h->GetValue(val);
+    if (val == 1)
+    {
+        bin_v->SetValue(2);
+        bin_h->SetValue(2);
+    }
+    else
+    {
+        bin_v->SetValue(1);
+        bin_h->SetValue(1);
+    }
+
+    device->StreamEnable();
+    resetStream();
+    startAcquisition();
+}
+
+void Receiver::resetStream()
+{
+    display_thread->ResetStatistics();
+    uint32_t payload_size = device->GetPayloadSize();
+    if (payload_size > 0)
+    {
+        pipeline->SetBufferSize(payload_size);
+    }
+
+    pipeline->Reset();
+    display_thread->ResetStatistics();
+}
