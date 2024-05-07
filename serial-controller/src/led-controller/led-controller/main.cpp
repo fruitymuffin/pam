@@ -7,21 +7,6 @@
 
 // Clock params
 #define F_CPU 8000000UL
-#define PERIOD 80
-
-// USART 2 params
-#define USART_BAUD_RATE(BAUD_RATE) ((float)(8000000UL * 64 / (16 * (float)BAUD_RATE)) + 0.5)
-#define MAX_INPUT_LEN 512
-#define MAX_NUM_COMMANDS 128
-#define MAX_NUM_INTS 3*MAX_NUM_COMMANDS
-
-
-// Analog out params
-#define DAC_BLUE 1
-#define DAC_WHITE 0
-
-// General params
-#define CAMERA_TRIGGER_PULSE_WIDTH 100 // us
 
 #include <avr/io.h>
 #include <avr/interrupt.h>
@@ -32,9 +17,35 @@
 #include <stdio.h>
 #include <errno.h>
 
+// USART 2 params
+#define USART_BAUD_RATE(BAUD_RATE) ((float)(8000000UL * 64 / (16 * (float)BAUD_RATE)) + 0.5)
+#define MAX_INPUT_LEN 512
+#define MAX_NUM_COMMANDS 128
+#define MAX_NUM_INTS 3*MAX_NUM_COMMANDS
+
+// Analog out params
+#define DAC_BLUE 1
+#define DAC_WHITE 0
+
+// General params
+#define CAMERA_TRIGGER_PULSE_WIDTH 100 // us
+
+// Timer params
+#define TCB0_TOP 0x190
+#define TCB1_TOP 0x4E20
+
+// LED params
+#define MAX_AVG_CURRENT  2067 // mA
+#define MAX_V_SET        2400 // mV
+#define CURRENT_SLEW     200   // mA/us
+inline uint8_t getShortTime(const uint16_t& vset) {return vset * MAX_AVG_CURRENT / MAX_V_SET / CURRENT_SLEW;}
+
+// Globals
 uint16_t dac_white_value = 0;
 uint16_t dac_blue_value = 0;
 volatile uint32_t time = 0; // (us)
+uint16_t white_led_on_time = 0; // (ms)
+uint16_t white_led_brightness = 320; // DAC value
 
 // These are the specific actions that
 enum Action
@@ -43,15 +54,15 @@ enum Action
 	WRITE_DAC_BLUE,
 	BLUE_PULSE,
 	WHITE_PULSE,
-	TRIGGER_HIGH,
-	TRIGGER_LOW
+	SET_DAC_WHITE,
+	TRIGGER_HIGH
 };
 
 struct Command
 {
 	int action;
 	uint32_t time;
-	uint16_t value;
+	uint32_t value;
 };
 
 void CLOCK_init()
@@ -98,7 +109,7 @@ void USART2_init(uint16_t baud)
 	USART2.CTRLC |= USART_PMODE0_bm | USART_SBMODE_1BIT_gc | USART_CHSIZE_8BIT_gc;
 
 	// Initial serial garbage makes messages fail if they occur too soon after init
-	//_delay_ms(32);
+	_delay_ms(32);
 }
 
 void SPI0_init()
@@ -149,7 +160,6 @@ void GPIO_init(void)
 	writeDACn(DAC_WHITE, 0);
 }
 
-
 uint8_t USART2_readChar()
 {
 	// Wait for unread data in the receive buffer
@@ -199,8 +209,6 @@ void USART2_readString(char* str)
 	}
 }
 
-
-
 bool parse(const char* c, char** end, Command* cmds, size_t& idx)
 {
 	//printf("Parsing '%s':\n", c);
@@ -243,39 +251,100 @@ bool parse(const char* c, char** end, Command* cmds, size_t& idx)
 	idx = n / 3;
 	for(int i = 0; i < n; i += 3)
 	{
-		cmds[i/3] = {int(buffer[i]), buffer[i+1], (buffer[i+2]) };
+		cmds[i/3] = {int(buffer[i]), buffer[i+1], buffer[i+2] };
 	}
 
 	return true;
 }
 
-void shutdownDACn(uint16_t n)
+void TCB0_init(void)
 {
-	// Add configuration bits for DAC selection (a/b) and the shutdown bit
-	uint16_t value = (n >= 0x01) << 15 & ~(0x01 << 12);
+	// Default mode and clock source are OK
+	
+	// Enable overflow interrupt
+	TCB0.INTCTRL = TCB_OVF_bm;
+	
+	// Set TOP value to correspond with 50us pulse width
+	TCB0.CCMP = TCB0_TOP;
+}
 
-	value++;
+void TCB1_init(void)
+{
+	// Default mode and clock source are OK
+	
+	// Enable overflow interrupt
+	TCB1.INTCTRL = TCB_CAPT_bm;
+	
+	TCB1.CTRLA |= TCB_CLKSEL_DIV2_gc;
+	
+	// Set TOP value to correspond with 50us pulse width
+	TCB1.CCMP = TCB1_TOP;
 }
 
 void TCA0_init(void)
 {
 	/* set Normal mode */
 	TCA0.SINGLE.CTRLB = TCA_SINGLE_WGMODE_NORMAL_gc;
+	
+	// Enable count interrupts for both count 0, 1
+	TCA0.SINGLE.INTCTRL = TCA_SINGLE_CMP0EN_bm | TCA_SINGLE_CMP1EN_bm;
 	/* disable event counting */
 	TCA0.SINGLE.EVCTRL &= ~(TCA_SINGLE_CNTAEI_bm);
-	/* set the period */
-	TCA0.SINGLE.PER = PERIOD;
-	TCA0.SINGLE.CTRLA = TCA_SINGLE_CLKSEL_DIV1_gc | TCA_SINGLE_ENABLE_bm; /* start timer */
+	// Set prescale
+	TCA0.SINGLE.CTRLA = TCA_SINGLE_CLKSEL_DIV1_gc;
 }
 
-ISR(TCA0_OVF_vect)
+ISR(TCA0_CMP0_vect)
 {
-	time += 10;
-	/* The interrupt flag has to be cleared manually */
-	TCA0.SINGLE.INTFLAGS = TCA_SINGLE_OVF_bm;
+	PORTD_OUTCLR = PIN2_bm;
+	TCA0.SINGLE.INTFLAGS |= TCA_SINGLE_CMP0_bm;
 }
 
-void delayMicroseconds(uint32_t us)
+ISR(TCA0_CMP1_vect)
+{
+	PORTD_OUTCLR = PIN0_bm;
+	TCA0.SINGLE.INTFLAGS |= TCA_SINGLE_CMP1_bm;
+	
+	TCA0.SINGLE.INTCTRL &= ~TCA_SINGLE_CMP0EN_bm & ~TCA_SINGLE_CMP1EN_bm;
+	
+	TCA0.SINGLE.CTRLA &= ~TCA_SINGLE_ENABLE_bm;
+}
+
+ISR(TCB0_INT_vect)
+{
+	// Set the trigger low
+	PORTC_OUTCLR = PIN2_bm;
+	
+	// Turn off interrupt
+	TCB0.INTCTRL = 0;
+}
+
+ISR(TCB1_INT_vect)
+{
+	static uint16_t counter = 0;
+	
+	// Increment time, we have 8Mhz clock with DIV2 prescale so
+	// milliseconds = count / 4000
+	counter += TCB1_TOP / 4000;
+	
+	if (counter >= white_led_on_time)
+	{
+		// Turn off interrupt
+		TCB1.INTCTRL = 0;
+		
+		// Turn off white LED
+		writeDACn(DAC_WHITE, 0);
+		
+		// Reset counter for next time
+		counter = 0;
+		
+		// Disable interrupt
+		TCB1.INTCTRL &= ~TCB_CAPT_bm;
+	}
+	TCB1.INTFLAGS = TCB_CAPT_bm;
+}
+
+void delayMicroseconds(uint16_t us)
 {
 	// for the 8 MHz internal clock
 
@@ -302,6 +371,59 @@ void delayMicroseconds(uint32_t us)
 	// return = 4 cycles
 }
 
+void pulse(uint8_t tshort, uint32_t ton)
+{
+	// Reduce tshort by 2us, the overhead in enabling the timer
+	if (tshort > 2)
+	tshort -= 2;
+	else
+	tshort = 0;
+	
+	// Ton could range from 10us to 1000000us in theory. If it is larger than 8191us, change the prescale
+	if (ton > (uint16_t(~0) >> 3))
+	{
+		USART2_sendString("Pulse Big\n");
+		// Set prescale to x256 T = 32 (us)
+		TCA0.SINGLE.CTRLA = TCA_SINGLE_CLKSEL_DIV256_gc;
+		
+		// Enable interrupts
+		TCA0.SINGLE.INTCTRL = TCA_SINGLE_CMP1EN_bm;
+		
+		// Set compare value
+		TCA0.SINGLE.CMP1 = (tshort + ton) >> 5;
+		
+		// Enable
+		TCA0.SINGLE.CNT = 0;
+		TCA0.SINGLE.CTRLA |= TCA_SINGLE_ENABLE_bm;
+		
+		// Set pins ON
+		PORTD_OUTSET = PIN0_bm | PIN2_bm;
+		
+		// Wait tshort microseconds and turn OFF short
+		delayMicroseconds(tshort+2);
+		PORTD_OUTCLR = PIN2_bm;
+	}
+	else
+	{
+		USART2_sendString("Pulse\n");
+		// Enable interrupts
+		TCA0.SINGLE.INTCTRL |= TCA_SINGLE_CMP0EN_bm | TCA_SINGLE_CMP1EN_bm;
+		
+		// Set prescale DIV1
+		TCA0.SINGLE.CTRLA = TCA_SINGLE_CLKSEL_DIV1_gc;
+		
+		// Set compare values
+		TCA0.SINGLE.CMP0 = tshort << 3;
+		TCA0.SINGLE.CMP1 = (tshort + ton) << 3;
+		
+		// Enable
+		TCA0.SINGLE.CNT = 0;
+		TCA0.SINGLE.CTRLA |= TCA_SINGLE_ENABLE_bm;
+		
+		// Set pins ON
+		PORTD_OUTSET = PIN0_bm | PIN2_bm;
+	}
+}
 
 void execute(Command* cmds, size_t idx)
 {
@@ -323,33 +445,48 @@ void execute(Command* cmds, size_t idx)
 				case WRITE_DAC_BLUE:
 					dac_blue_value = cmds[i].value;
 					writeDACn(DAC_BLUE, dac_blue_value);
-					tshort = getShortTime(dac_white_value);
 					break;
 				case BLUE_PULSE:
-					pulse(tshort, cmds[i].value);
+					pulse(getShortTime(dac_blue_value), cmds[i].value);
 					break;
 				case WHITE_PULSE:
-					pulse(tshortw, cmds[i].value);
+					TCB1.CNT = 0x00;
+					// Turn on interrupt
+					TCB1.INTCTRL = TCB_CAPT_bm;
+					
+					// Set on time
+					white_led_on_time = cmds[i].value;
+										
+					// Turn on white LED
+					writeDACn(DAC_WHITE, white_led_brightness);
+					
+					// Start timer B
+					TCB1.CTRLA |= TCB_ENABLE_bm;
+					
 					break;
+				case SET_DAC_WHITE:
+					white_led_brightness = cmds[i].value;
+					break;
+					
+				case TRIGGER_HIGH:
+					// Reset timer count and top value
+					TCB0_CNT = 0x00;
+					
+					// Turn on interrupt
+					TCB0.INTCTRL = TCB_OVF_bm;
+					
+					// Start timer B
+					TCB0.CTRLA = TCB_ENABLE_bm;
+					
+					// Write pin high
+					PORTC_OUTSET = PIN2_bm;
 				default:
 					break;
 			}
 			i++;	
 		}
 	}
-	TCA0.SINGLE.INTCTRL &= ~TCA_SINGLE_OVF_bm;
 }
-
-void pulse(uint8_t tshort, uint8_t ton)
-{
-	PORTD_OUTSET = PIN0_bm | PIN2_bm;
-	delayMicroseconds(tshort);
-	PORTD_OUTCLR = PIN2_bm;
-	delayMicroseconds(ton);
-	PORTD_OUTCLR = PIN0_bm;
-}
-
-
 
 int main(void)
 {
@@ -359,8 +496,9 @@ int main(void)
 	GPIO_init();
 	USART2_init(9600);
 	TCA0_init();
+	TCB1_init();
 	sei();
-				
+			
 	// Receive buffer for all commands
 	char buffer[MAX_INPUT_LEN];
 	Command commands[MAX_NUM_COMMANDS];
@@ -377,7 +515,7 @@ int main(void)
 			USART2_sendString("Good parse!\n");
 			for(int i = 0; i < idx; i++)
 			{
-				sprintf(buffer, "{\n\t%d \n\t%lu \n\t%u \n}\n", commands[i].action, commands[i].time, commands[i].value);
+				sprintf(buffer, "{\n\t%d \n\t%lu \n\t%lu \n}\n", commands[i].action, commands[i].time, commands[i].value);
 				USART2_sendString(buffer);
 			}
 			execute(commands, idx);

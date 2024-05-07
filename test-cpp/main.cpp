@@ -360,6 +360,11 @@ static void print_device(libusb_device *dev, libusb_device_handle *handle)
 }
 
 
+#define MAX_AVG_CURRENT  2067 // mA
+#define MAX_V_SET        2400 // mV
+#define CURRENT_SLEW     200   // mA/us
+inline uint8_t getShortTime(uint16_t vset) {return vset * MAX_AVG_CURRENT / MAX_V_SET / CURRENT_SLEW;}
+
 int main(void)
 {
 	//std::vector<Command> c = makePamSequence(4, 20, 1.0f, 300000, 2.0f, 8);
@@ -389,5 +394,15 @@ int main(void)
 
 	libusb_exit(NULL);
 
+<<<<<<< Updated upstream
+=======
+	auto cd = makeDeltaTimes(c);
+	std::cout << makeCommandString(cd).str() << std::endl;
+
+	for (uint16_t i = 0; i < 5000; i+=100)
+	{
+		std::cout << "Vset = " << i << "mV\t" << "Short Time = " << +getShortTime(i) << "us" << std::endl;
+	}
+>>>>>>> Stashed changes
     return 0;
 }
