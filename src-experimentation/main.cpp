@@ -394,8 +394,6 @@ int main(void)
 
 	libusb_exit(NULL);
 
-<<<<<<< Updated upstream
-=======
 	auto cd = makeDeltaTimes(c);
 	std::cout << makeCommandString(cd).str() << std::endl;
 
@@ -403,6 +401,5 @@ int main(void)
 	{
 		std::cout << "Vset = " << i << "mV\t" << "Short Time = " << +getShortTime(i) << "us" << std::endl;
 	}
->>>>>>> Stashed changes
     return 0;
 }

@@ -26,6 +26,9 @@
 *.a
 *.lib
 
+# Qt related build files
+*.qrc
+
 # Executables
 *.exe
 *.out
