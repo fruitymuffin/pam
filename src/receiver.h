@@ -4,8 +4,12 @@
 // Implements the specific eBUS library functionality we need for
 // the pam vision system.
 // Handles camera connection, configuration, and streaming.
+// 
+// This could be more tidy with some separation into more classes but for
+// a draft that adds some complexity.
+//
 // Displaying images and saving the raw data is handled by seperate
-// classes.
+// class
 //
 // *****************************************************************************
 
@@ -29,6 +33,7 @@
 #include <PvBuffer.h>
 #include <PvPipeline.h>
 #include <PvDisplayWnd.h>
+#include <PvAcquisitionStateManager.h>
 
 // project
 #include "displaythread.h"
@@ -58,7 +63,7 @@ struct DeviceParams
 };
 
 // Receiver
-class Receiver
+class Receiver : public PvAcquisitionStateEventSink
 {
     public:
         Receiver(PvDisplayWnd* _display_wnd);
@@ -78,10 +83,16 @@ class Receiver
         void startAcquisition();
         void stopAcquisition();
         bool isAcquiring();
-        void startTriggeredMultiframe(int n);
+        void startTriggeredMultiFrameMode(int n);
         void toggleBinning();
         void resetStream();
+        bool isMultiFrame();
+        void startViewFinderMode();
         DeviceParams getDeviceParams();
+
+    protected:
+        // Callback when acquisition state has changed. This function in inherited from PvAcquisitionStateEventSink.
+        void OnAcquisitionStateChanged(PvDevice* _device, PvStream* _stream, uint32_t _source, PvAcquisitionState _state );
 
     private:
         // Reciever will own a device, connection, stream and pipeline
@@ -94,9 +105,11 @@ class Receiver
         DisplayThread* display_thread;
         PvGenParameterArray* params;    // Actual device params
         DeviceParams device_params;     // Struct with some params for populating gui
+        PvAcquisitionStateManager* acquisition_manager;
 
         bool acquiring;
-};
+        bool multiframe_mode;
+    };
 
 
 #endif // __RECIEVER_H__

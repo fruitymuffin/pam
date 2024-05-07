@@ -22,12 +22,18 @@ Receiver::Receiver(PvDisplayWnd* _display_wnd) :
                 configureStream();
                 device->StreamEnable();
 
+                // Now that we are connected and have a stream, hook up our acquisition state callback
+                acquisition_manager = new PvAcquisitionStateManager(device, stream);
+                acquisition_manager->RegisterEventSink(this);
+
                 // Start image acquisition (continuous)
-                startAcquisition();
+                startViewFinderMode();
 
                 // Start the display thread/pipeline to put images on the screen
                 display_thread = new DisplayThread(display_wnd);
                 pipeline = new PvPipeline(stream);
+
+                
                 
                 display_thread->Start(pipeline, params);
                 pipeline->Start();
@@ -88,7 +94,6 @@ DeviceParams Receiver::getDeviceParams()
 
     return device_params;
 }
-
 
 bool Receiver::isConnected()
 {
@@ -174,6 +179,7 @@ bool Receiver::openStream()
         PvStream::Free(stream);
         return false;
     }
+
     return true;
 }
 
@@ -200,22 +206,14 @@ bool Receiver::isAcquiring()
 
 void Receiver::stopAcquisition()
 {
-    PvGenCommand *cmd = dynamic_cast<PvGenCommand *>( params->Get( "AcquisitionStop" ) );
-    
-    // Send stop acquisition command
-    cmd->Execute();
+    acquisition_manager->Stop();
 
     acquiring = false;
 }
 
 void Receiver::startAcquisition()
 {
-    resetStream();
-
-    PvGenCommand *cmd = dynamic_cast<PvGenCommand *>( params->Get( "AcquisitionStart" ) );
-
-    // Send start acquisition command
-    cmd->Execute();
+    acquisition_manager->Start();
 
     acquiring = true;
 }
@@ -267,18 +265,43 @@ void Receiver::freeStreamBuffers()
     buffers.clear();
 }
 
-void Receiver::startTriggeredMultiframe(int n)
+void Receiver::startTriggeredMultiFrameMode(int n)
 {
+    std::cout << "startTriggeredMultiFrameMode()" << std::endl;
+    // Stop acquisition
     stopAcquisition();
-    // Settings to apply are acquisition mode and trigger enable
+    multiframe_mode = true;
+
+    // Set acquisition mode to multiframe
     PvGenEnum *cmd = dynamic_cast<PvGenEnum *>( params->Get( "AcquisitionMode" ) );
     cmd->SetValue("MultiFrame");
 
+    // Enable line-5 trigger
     cmd = dynamic_cast<PvGenEnum*>(params->Get("TriggerMode"));
     cmd->SetValue("On");
 
-    //cmd = dynamic_cast<PvGenCommand *>( params->Get( "" ) );
+    // Set number of frames
+    PvGenInteger *cmd_int = dynamic_cast<PvGenInteger*>(params->Get("AcquisitionFrameCount"));
+    cmd_int->SetValue(n);
 
+    startAcquisition();
+}
+
+void Receiver::startViewFinderMode()
+{
+    // Stop acquisition
+    stopAcquisition();
+    multiframe_mode = false;
+
+    // Set acquisition mode to multiframe
+    PvGenEnum *cmd = dynamic_cast<PvGenEnum *>( params->Get( "AcquisitionMode" ) );
+    cmd->SetValue("Continuous");
+
+    // Enable line-5 trigger
+    cmd = dynamic_cast<PvGenEnum*>(params->Get("TriggerMode"));
+    cmd->SetValue("Off");
+
+    startAcquisition();
 }
 
 void Receiver::toggleBinning()
@@ -318,3 +341,21 @@ void Receiver::resetStream()
     pipeline->Reset();
 }
 
+void Receiver::OnAcquisitionStateChanged(PvDevice* _device, PvStream* _stream, uint32_t _source, PvAcquisitionState _state )
+{
+    if (_state == PvAcquisitionStateUnlocked )
+    {
+        // Finished multiframe acquitision
+        std::cout << "Press spacebar to continue" << std::endl;
+        acquiring = false;
+    }
+    else
+    {
+        std::cout << "\nStarting capture..." << std::endl;
+    }
+}
+
+bool Receiver::isMultiFrame()
+{
+    return multiframe_mode;
+}
