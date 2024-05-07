@@ -164,13 +164,19 @@ void Gui::keyPressEvent(QKeyEvent* event)
             {
                 if (receiver->isAcquiring())
                 {
-                    receiver->stopAcquisition();
+                    if(!receiver->isMultiFrame())
+                    {
+                        // We were just in viewfinder mode
+                        receiver->startTriggeredMultiFrameMode(5);
+                    }
                 }
                 else
                 {
-                    receiver->startAcquisition();
+                    if (receiver->isMultiFrame())
+                    {
+                        receiver->startViewFinderMode();
+                    }
                 }
-
             }
             break;
 
