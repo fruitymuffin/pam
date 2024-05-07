@@ -117,7 +117,7 @@ ifneq ($(FILES_QTGUI),)
     ifneq ($(FILES_MOC),)
     	SRC_MOC          := $(addprefix $(SRC_DIR)/, $(FILES_MOC:%h=moc_%cxx))
 
-    	FILES_QRC         = $(notdir $(shell ls $(SRC_DIR)/*.qrc))
+    	FILES_QRC         = $(notdir $(shell ls $(SRC_DIR)/\*.qrc))
     	SRC_QRC          := $(addprefix $(SRC_DIR)/, $(FILES_QRC:%qrc=qrc_%cxx))
 
 	    OBJS             += $(SRC_MOC:$(SRC_DIR)/%.cxx=$(BUILD_DIR)/%.o)
@@ -137,11 +137,10 @@ OBJS      += $(SRC_CS:$(SRC_DIR)/%.c=$(BUILD_DIR)/%.o)
 # Make a .d file for each .o
 DEPS = $(OBJS:%.o=%.d)
 
-
-
 $(info OBJS is $(OBJS))
 
 all: $(EXEC)
+	rm -rf $(SRC_MOC) $(SRC_QRC)
 
 clean:
 	rm -rf $(SRC_MOC) $(SRC_QRC)
