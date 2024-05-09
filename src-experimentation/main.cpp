@@ -394,8 +394,8 @@ int main(void)
 
 	libusb_exit(NULL);
 
-	auto cd = makeDeltaTimes(c);
-	std::cout << makeCommandString(cd).str() << std::endl;
+	//auto cd = makeDeltaTimes(c);
+	//std::cout << makeCommandString(cd).str() << std::endl;
 
 	for (uint16_t i = 0; i < 5000; i+=100)
 	{

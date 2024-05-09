@@ -1,6 +1,7 @@
 #include "displaythread.h"
 #include <chrono>
 #include <sstream>
+#include <iostream>
 
 void DisplayThread::setSaving(const bool& _save)
 {
@@ -13,9 +14,16 @@ std::string DisplayThread::getFileName()
     std::stringstream ss;
 
     auto duration = std::chrono::system_clock::now().time_since_epoch();
-    auto millis = std::chrono::duration_cast<std::chrono::milliseconds>(duration).count();
-    ss << millis << " - " << sequence << ".png";
+    auto micros = std::chrono::duration_cast<std::chrono::microseconds>(duration).count();
+    ss << path << micros << " - " << sequence << ".png";
+    std::cout << ss.str() << std::endl;
+    
     return ss.str();
+}
+
+void DisplayThread::setSavingPath(const std::string& _path)
+{
+    path = _path;
 }
 
 DisplayThread::DisplayThread(PvDisplayWnd* _display_wnd) :
@@ -26,7 +34,12 @@ DisplayThread::DisplayThread(PvDisplayWnd* _display_wnd) :
 
 void DisplayThread::OnBufferRetrieved (PvBuffer *_buffer)
 {
-    // Nothing right now
+    // If saving, do it here
+    if (is_saving)
+    {
+        buffer_writer->Store(_buffer, PvString(getFileName().c_str()), PvBufferFormatType::PvBufferFormatPNG, NULL);
+        sequence++;
+    }
 }
 
 void DisplayThread::OnBufferDisplay (PvBuffer *_buffer)
@@ -37,12 +50,7 @@ void DisplayThread::OnBufferDisplay (PvBuffer *_buffer)
 
 void DisplayThread::OnBufferDone (PvBuffer *_buffer)
 {
-    // If saving, do it here
-    if (is_saving)
-    {
-        buffer_writer->Store(_buffer, PvString(getFileName().c_str()), PvBufferFormatType::PvBufferFormatPNG, NULL);
-        sequence++;
-    }
+
 }
 
 void DisplayThread::OnBufferLog (const PvString &_log)

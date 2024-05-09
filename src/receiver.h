@@ -70,6 +70,7 @@ class Receiver : public PvAcquisitionStateEventSink
         ~Receiver();
         
         // Pulic functions
+        void quit();
         bool isConnected();
         bool selectDevice();
         bool openStream();
@@ -88,6 +89,7 @@ class Receiver : public PvAcquisitionStateEventSink
         void resetStream();
         bool isMultiFrame();
         void startViewFinderMode();
+        void setSavingPath(const std::string& _path);
         DeviceParams getDeviceParams();
 
     protected:

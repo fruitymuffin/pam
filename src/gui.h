@@ -19,22 +19,26 @@
 
 // project
 #include "receiver.h"
+#include "signalhandler.h"
 
 #define MENU_WIDTH 120
 
-class Gui : public QWidget
+class Gui : public QWidget, public SignalHandler
 {
     Q_OBJECT
     
     public:
         explicit Gui(QWidget *parent = 0);
-        void createLayout();
+        void setImagePath(const std::string& path);
+        bool handleSignal(int signal);
+        void quit();
 
     protected:
         void keyPressEvent(QKeyEvent* event) override;
 
     private:
         // Ui element functions
+        void createLayout();
         QVBoxLayout* createMenu();
         void createDisplay();
         void updateParameters();

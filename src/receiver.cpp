@@ -26,20 +26,18 @@ Receiver::Receiver(PvDisplayWnd* _display_wnd) :
                 acquisition_manager = new PvAcquisitionStateManager(device, stream);
                 acquisition_manager->RegisterEventSink(this);
 
-                // Start image acquisition (continuous)
-                startViewFinderMode();
-
                 // Start the display thread/pipeline to put images on the screen
                 display_thread = new DisplayThread(display_wnd);
                 pipeline = new PvPipeline(stream);
 
-                
-                
                 display_thread->Start(pipeline, params);
                 pipeline->Start();
 
                 // Docs said to do this....I assume so that the thread gets time from OS?
                 display_thread->SetPriority(50);
+
+                // Start image acquisition (continuous)
+                startViewFinderMode();
             }
         }
     }
@@ -51,6 +49,15 @@ Receiver::~Receiver()
     PvStream::Free(stream); 
     device->Disconnect();
     PvDevice::Free(device);
+}
+
+void Receiver::quit()
+{
+    stopAcquisition();
+    display_thread->Stop(false);
+    pipeline->Stop();
+    stream->Close();
+    device->Disconnect();
 }
 
 DeviceParams Receiver::getDeviceParams()
@@ -284,6 +291,8 @@ void Receiver::startTriggeredMultiFrameMode(int n)
     PvGenInteger *cmd_int = dynamic_cast<PvGenInteger*>(params->Get("AcquisitionFrameCount"));
     cmd_int->SetValue(n);
 
+    display_thread->setSaving(true);
+
     startAcquisition();
 }
 
@@ -300,6 +309,11 @@ void Receiver::startViewFinderMode()
     // Enable line-5 trigger
     cmd = dynamic_cast<PvGenEnum*>(params->Get("TriggerMode"));
     cmd->SetValue("Off");
+
+    if (display_thread != nullptr)
+    {
+        display_thread->setSaving(false);
+    }
 
     startAcquisition();
 }
@@ -346,7 +360,8 @@ void Receiver::OnAcquisitionStateChanged(PvDevice* _device, PvStream* _stream, u
     if (_state == PvAcquisitionStateUnlocked )
     {
         // Finished multiframe acquitision
-        std::cout << "Press spacebar to continue" << std::endl;
+        std::cout << "Finished multiframe - press space to continue" << std::endl;
+        
         acquiring = false;
     }
     else
@@ -358,4 +373,9 @@ void Receiver::OnAcquisitionStateChanged(PvDevice* _device, PvStream* _stream, u
 bool Receiver::isMultiFrame()
 {
     return multiframe_mode;
+}
+
+void Receiver::setSavingPath(const std::string& _path)
+{
+    display_thread->setSavingPath(_path);
 }

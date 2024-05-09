@@ -1,11 +1,10 @@
 #include "gui.h"
-
 #include <QLabel>
 #include <QSizePolicy>
 
 
 Gui::Gui(QWidget *parent)
-    : QWidget(parent), display_wnd(nullptr), display_widget(nullptr)
+    : QWidget(parent), display_wnd(nullptr), display_widget(nullptr), SignalHandler(SignalHandler::SIG_INT)
 {
     // Create display adapter
     display_wnd = new PvDisplayWnd;
@@ -25,6 +24,23 @@ Gui::Gui(QWidget *parent)
     {
         updateParameters();
     }
+}
+
+bool Gui::handleSignal(int signal)
+{
+    quit();
+    
+    return false;
+}
+
+void Gui::quit()
+{
+    receiver->quit();
+}
+
+void Gui::setImagePath(const std::string& path)
+{
+    receiver->setSavingPath(path);
 }
 
 void Gui::createLayout()
