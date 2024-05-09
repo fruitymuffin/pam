@@ -11,6 +11,7 @@
 // Qt5
 #include <QWidget>
 #include <QLineEdit>
+#include <QRadioButton>
 #include <QVBoxLayout>
 #include <QKeyEvent>
 
@@ -21,7 +22,7 @@
 #include "receiver.h"
 #include "signalhandler.h"
 
-#define MENU_WIDTH 120
+static const std::string SEND_STR = "1 0 800    5 0 0    5 100 0 2 100 512     1 199 1200    5 200 0 2 200 300000 5 498 0    5 700 0";
 
 class Gui : public QWidget, public SignalHandler
 {
@@ -43,6 +44,11 @@ class Gui : public QWidget, public SignalHandler
         void createDisplay();
         void updateParameters();
 
+    public slots:
+        void onExposureEdit();
+        void onBinningEdit();
+        void onGainEdit();
+
     private:
         // Ui element variables
         QLineEdit* name_field;
@@ -50,7 +56,7 @@ class Gui : public QWidget, public SignalHandler
         QLineEdit* mac_field;
         QLineEdit* gain_field;
         QLineEdit* m_exp_field;
-        QLineEdit* bin_field;
+        QRadioButton* bin_field;
         QLineEdit* width_field;
         QLineEdit* height_field;
 

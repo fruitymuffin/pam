@@ -37,15 +37,16 @@
 
 // project
 #include "displaythread.h"
+#include "stringtools.h"
 
 // Default software-side params
 #define DEFAULT_BUFFER_COUNT 4
 
 // Default camera-side params
-#define DEFAULT_EXPOSURE_TIME 32000
-#define DEFAULT_MULTIFRAME_COUNT 8
-#define DEFAULT_MULTIFRAME_RATE 8
-#define DEFAULT_SENSOR_GAIN 1
+#define MIN_GAIN 1
+#define MAX_GAIN 126
+#define MIN_EXPOSURE 1
+#define MAX_EXPOSURE 43408
 
 // Typedefs
 typedef std::list<PvBuffer *> BufferList;
@@ -85,12 +86,25 @@ class Receiver : public PvAcquisitionStateEventSink
         void stopAcquisition();
         bool isAcquiring();
         void startTriggeredMultiFrameMode(int n);
-        void toggleBinning();
+
+        void setExposure(int);
+        void setBinning(bool);
+        void setGain(int);
+        
         void resetStream();
         bool isMultiFrame();
         void startViewFinderMode();
         void setSavingPath(const std::string& _path);
         DeviceParams getDeviceParams();
+        void setState();    // Cycles between Paused, viewfinder and multi
+
+        // States
+        enum STATES
+        {
+            CONTINIOUS,
+            MULTIFRAME,
+            PAUSED            
+        };
 
     protected:
         // Callback when acquisition state has changed. This function in inherited from PvAcquisitionStateEventSink.
@@ -109,8 +123,7 @@ class Receiver : public PvAcquisitionStateEventSink
         DeviceParams device_params;     // Struct with some params for populating gui
         PvAcquisitionStateManager* acquisition_manager;
 
-        bool acquiring;
-        bool multiframe_mode;
+        int state;
     };
 
 

@@ -1,5 +1,4 @@
 #include "receiver.h"
-#include "stringtools.h"
 #include <PvDecompressionFilter.h>
 
 Receiver::Receiver(PvDisplayWnd* _display_wnd) :
@@ -8,7 +7,8 @@ Receiver::Receiver(PvDisplayWnd* _display_wnd) :
     stream(nullptr),
     pipeline(nullptr),
     display_thread(nullptr),
-    params(nullptr)
+    params(nullptr),
+    state(PAUSED)
 {
     if (selectDevice() )
     {
@@ -37,7 +37,7 @@ Receiver::Receiver(PvDisplayWnd* _display_wnd) :
                 display_thread->SetPriority(50);
 
                 // Start image acquisition (continuous)
-                startViewFinderMode();
+                setState();
             }
         }
     }
@@ -206,23 +206,20 @@ void Receiver::configureStream()
     }
 }
 
-bool Receiver::isAcquiring()
-{
-    return acquiring;
-}
-
 void Receiver::stopAcquisition()
 {
-    acquisition_manager->Stop();
-
-    acquiring = false;
+    if (acquisition_manager->GetState() == PvAcquisitionStateLocked)
+    {
+        acquisition_manager->Stop();
+    }
 }
 
 void Receiver::startAcquisition()
 {
-    acquisition_manager->Start();
-
-    acquiring = true;
+    if (acquisition_manager->GetState() != PvAcquisitionStateLocked)
+    {
+        acquisition_manager->Start();
+    }
 }
 
 void Receiver::createStreamBuffers()
@@ -274,10 +271,8 @@ void Receiver::freeStreamBuffers()
 
 void Receiver::startTriggeredMultiFrameMode(int n)
 {
-    std::cout << "startTriggeredMultiFrameMode()" << std::endl;
     // Stop acquisition
     stopAcquisition();
-    multiframe_mode = true;
 
     // Set acquisition mode to multiframe
     PvGenEnum *cmd = dynamic_cast<PvGenEnum *>( params->Get( "AcquisitionMode" ) );
@@ -300,7 +295,6 @@ void Receiver::startViewFinderMode()
 {
     // Stop acquisition
     stopAcquisition();
-    multiframe_mode = false;
 
     // Set acquisition mode to multiframe
     PvGenEnum *cmd = dynamic_cast<PvGenEnum *>( params->Get( "AcquisitionMode" ) );
@@ -318,17 +312,14 @@ void Receiver::startViewFinderMode()
     startAcquisition();
 }
 
-void Receiver::toggleBinning()
+void Receiver::setBinning(bool binning)
 {
     stopAcquisition();
     device->StreamDisable();
     // Read current binning param
     PvGenInteger* bin_h = dynamic_cast<PvGenInteger *>(params->Get("BinningHorizontal"));
     PvGenInteger* bin_v = dynamic_cast<PvGenInteger *>(params->Get("BinningVertical"));
-
-    int64_t val;
-    bin_h->GetValue(val);
-    if (val == 1)
+    if (binning)
     {
         bin_v->SetValue(2);
         bin_h->SetValue(2);
@@ -337,6 +328,38 @@ void Receiver::toggleBinning()
     {
         bin_v->SetValue(1);
         bin_h->SetValue(1);
+    }
+
+    device->StreamEnable();
+    startAcquisition();
+}
+
+void Receiver::setGain(int gain)
+{
+    stopAcquisition();
+    device->StreamDisable();
+    // Read current binning param
+    PvGenFloat* gain_param = dynamic_cast<PvGenFloat *>(params->Get("Gain"));
+
+    if (gain <= MAX_GAIN && gain >= MIN_GAIN)
+    {
+        gain_param->SetValue(static_cast<double>(gain));
+    }
+
+    device->StreamEnable();
+    startAcquisition();
+}
+
+void Receiver::setExposure(int exposure)
+{
+    stopAcquisition();
+    device->StreamDisable();
+    // Read current binning param
+    PvGenFloat* exposure_param = dynamic_cast<PvGenFloat *>(params->Get("ExposureTime"));
+
+    if (exposure < MAX_EXPOSURE && exposure >= MIN_EXPOSURE)
+    {
+        exposure_param->SetValue(static_cast<double>(exposure));
     }
 
     device->StreamEnable();
@@ -359,23 +382,43 @@ void Receiver::OnAcquisitionStateChanged(PvDevice* _device, PvStream* _stream, u
 {
     if (_state == PvAcquisitionStateUnlocked )
     {
-        // Finished multiframe acquitision
-        std::cout << "Finished multiframe - press space to continue" << std::endl;
-        
-        acquiring = false;
+        if(state == MULTIFRAME)
+        {
+            setState();
+        }
     }
-    else
-    {
-        std::cout << "\nStarting capture..." << std::endl;
-    }
-}
-
-bool Receiver::isMultiFrame()
-{
-    return multiframe_mode;
 }
 
 void Receiver::setSavingPath(const std::string& _path)
 {
     display_thread->setSavingPath(_path);
+}
+
+void Receiver::setState()
+{    
+    if(state == PAUSED)
+    {
+        display_thread->setSaving(false);
+        display_thread->ResetStatistics();
+        pipeline->Reset();
+        startViewFinderMode();
+        state = CONTINIOUS;
+        std::cout << "Starting viewfinder" << std::endl;
+    }
+    else if (state == MULTIFRAME)
+    {
+        stopAcquisition();
+        state = PAUSED;
+        std::cout << "Paused" << std::endl;
+    }
+    else
+    {
+        startTriggeredMultiFrameMode(5);
+        display_thread->ResetStatistics();
+        pipeline->Reset();
+        display_thread->setSaving(true);
+        
+        state = MULTIFRAME;
+        std::cout << "Starting multiframe(5)" << std::endl;
+    }
 }

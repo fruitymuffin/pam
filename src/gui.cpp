@@ -1,6 +1,7 @@
 #include "gui.h"
 #include <QLabel>
 #include <QSizePolicy>
+#include "stringtools.h"
 
 
 Gui::Gui(QWidget *parent)
@@ -116,19 +117,18 @@ QVBoxLayout* Gui::createMenu()
     // Parameter field gain
     QLabel* gain_label = new QLabel(tr( "Gain" ));
     gain_field = new QLineEdit;
-    gain_field->setReadOnly( true );
-    gain_field->setEnabled( false );
+    gain_field->setReadOnly( false );
+    gain_field->setEnabled( true );
 
     // Parameter field Measuring Exposure
     QLabel* m_exp_label = new QLabel(tr( "Meas Exp (us)" ));
     m_exp_field = new QLineEdit;
-    m_exp_field->setReadOnly( true );
-    m_exp_field->setEnabled( false );
+    m_exp_field->setReadOnly( false );
+    m_exp_field->setEnabled( true );
 
     QLabel* bin_label = new QLabel(tr( "Pixel Binning" ));
-    bin_field = new QLineEdit;
-    bin_field->setReadOnly( false );
-    bin_field->setEnabled( false );
+    bin_field = new QRadioButton;
+    bin_field->setEnabled( true );
 
     QLabel* width_label = new QLabel(tr( "Width" ));
     width_field = new QLineEdit;
@@ -166,7 +166,43 @@ QVBoxLayout* Gui::createMenu()
     // Stretch element at the bottom of the layout files the remaining vertical space
     menu_layout->addStretch();
 
+    connect(m_exp_field, SIGNAL(editingFinished()), this, SLOT(onExposureEdit()));
+    connect(bin_field, SIGNAL(clicked()), this, SLOT(onBinningEdit()));
+    connect(gain_field, SIGNAL(editingFinished()), this, SLOT(onGainEdit()));
+
     return menu_layout;
+}
+
+void Gui::onExposureEdit()
+{
+    if (receiver->isConnected())
+    {
+        QString str = m_exp_field->text();
+        receiver->setExposure(str.toInt());
+    }
+    setFocus(Qt::OtherFocusReason);
+    updateParameters();
+}
+
+void Gui::onBinningEdit()
+{
+    if (receiver->isConnected())
+    {
+        receiver->setBinning(bin_field->isChecked());
+    }
+    setFocus(Qt::OtherFocusReason);
+    updateParameters();
+}
+
+void Gui::onGainEdit()
+{
+    if (receiver->isConnected())
+    {
+        QString str = gain_field->text();
+        receiver->setGain(str.toInt());
+    }
+    setFocus(Qt::OtherFocusReason);
+    updateParameters();
 }
 
 // Keypress event
@@ -178,29 +214,13 @@ void Gui::keyPressEvent(QKeyEvent* event)
             // start/stop stream
             if (receiver->isConnected())
             {
-                if (receiver->isAcquiring())
-                {
-                    if(!receiver->isMultiFrame())
-                    {
-                        // We were just in viewfinder mode
-                        receiver->startTriggeredMultiFrameMode(5);
-                    }
-                }
-                else
-                {
-                    if (receiver->isMultiFrame())
-                    {
-                        receiver->startViewFinderMode();
-                    }
-                }
+                receiver->setState();
             }
             break;
 
-        case Qt::Key_B:
-            if (receiver->isConnected())
-            {
-                receiver->toggleBinning();
-            }
+        case Qt::Key_S:
+            // Send a serial string
+            StringTools::sendSerialString(SEND_STR);
             break;
     }
 }

@@ -6,7 +6,7 @@
 void DisplayThread::setSaving(const bool& _save)
 {
     is_saving = _save;
-    sequence = 0;
+    sequence = 1;
 }
 
 std::string DisplayThread::getFileName()
