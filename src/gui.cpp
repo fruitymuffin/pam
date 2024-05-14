@@ -10,21 +10,24 @@ Gui::Gui(QWidget *parent)
     // Create display adapter
     display_wnd = new PvDisplayWnd;
     display_wnd->SetBackgroundColor(255, 200, 255);
-    receiver = new Receiver(display_wnd);
     display_widget = new QWidget();
     display_wnd->Create(display_widget);
+
     // Create the window layout
     createLayout();
 
-    
-    // Set window size
-    //setWindowState(Qt::WindowMaximized);
-    setFixedSize(720, 480);
+    setFixedSize(760, 420);
 
+    receiver = new Receiver(display_wnd);
     if(receiver->isConnected())
     {
         updateParameters();
     }
+}
+
+bool Gui::isInitialised()
+{
+    return receiver->isConnected();
 }
 
 bool Gui::handleSignal(int signal)
@@ -64,7 +67,7 @@ void Gui::createLayout()
 
     main_layout->addLayout(createMenu(), Qt::AlignLeft );
     main_layout->addWidget(display_widget);
-    main_layout->setStretch(0, 2);
+    main_layout->setStretch(0, 3);
     main_layout->setStretch(1, 5);
 }
 
@@ -140,25 +143,37 @@ QVBoxLayout* Gui::createMenu()
     height_field->setReadOnly( true );
     height_field->setEnabled( false );
 
+    QLabel* torch_label = new QLabel(tr( "Torch" ));
+    torch_button = new QToolButton();
+    torch_button->setCheckable(true);
+    torch_button->setText(tr("Torch ON/OFF"));
+    torch_slider = new QSlider(Qt::Horizontal);
+    torch_slider->setMinimum(0);
+    torch_slider->setMaximum(22);
+    torch_slider->setSingleStep(1);
+
     // Add fields to grid
     int row = 0;
     QGridLayout* grid_layout = new QGridLayout;
-    grid_layout->addWidget(name_label, row, 0); row++;
-    grid_layout->addWidget(name_field, row, 0); row++;
-    grid_layout->addWidget(ip_label, row, 0); row++;
-    grid_layout->addWidget(ip_field, row, 0); row++;
-    grid_layout->addWidget(mac_label, row, 0); row++;
-    grid_layout->addWidget(mac_field, row, 0); row++;
-    grid_layout->addWidget(gain_label, row, 0); row++;
-    grid_layout->addWidget(gain_field, row, 0); row++;
-    grid_layout->addWidget(m_exp_label, row, 0); row++;
-    grid_layout->addWidget(m_exp_field, row, 0); row++;
-    grid_layout->addWidget(bin_label, row, 0); row++;
-    grid_layout->addWidget(bin_field, row, 0); row++;
-    grid_layout->addWidget(width_label, row, 0); row++;
-    grid_layout->addWidget(width_field, row, 0); row++;
-    grid_layout->addWidget(height_label, row, 0); row++;
-    grid_layout->addWidget(height_field, row, 0);
+    grid_layout->addWidget(name_label, row, 0);
+    grid_layout->addWidget(name_field, row, 1); row++;
+    grid_layout->addWidget(ip_label, row, 0);
+    grid_layout->addWidget(ip_field, row, 1); row++;
+    grid_layout->addWidget(mac_label, row, 0); 
+    grid_layout->addWidget(mac_field, row, 1); row++;
+    grid_layout->addWidget(gain_label, row, 0); 
+    grid_layout->addWidget(gain_field, row, 1); row++;
+    grid_layout->addWidget(m_exp_label, row, 0); 
+    grid_layout->addWidget(m_exp_field, row, 1); row++;
+    grid_layout->addWidget(bin_label, row, 0); ;
+    grid_layout->addWidget(bin_field, row, 1); row++;
+    grid_layout->addWidget(width_label, row, 0); 
+    grid_layout->addWidget(width_field, row, 1); row++;
+    grid_layout->addWidget(height_label, row, 0);
+    grid_layout->addWidget(height_field, row, 1); row++;
+    grid_layout->addWidget(torch_label, row, 0);
+    grid_layout->addWidget(torch_slider, row, 1); row++;
+    grid_layout->addWidget(torch_button, row, 1);
 
     QVBoxLayout* menu_layout = new QVBoxLayout;
     menu_layout->addLayout(grid_layout);
@@ -169,8 +184,24 @@ QVBoxLayout* Gui::createMenu()
     connect(m_exp_field, SIGNAL(editingFinished()), this, SLOT(onExposureEdit()));
     connect(bin_field, SIGNAL(clicked()), this, SLOT(onBinningEdit()));
     connect(gain_field, SIGNAL(editingFinished()), this, SLOT(onGainEdit()));
+    connect(torch_button, SIGNAL(released()), this, SLOT(onTorchClick()));
 
     return menu_layout;
+}
+
+void Gui::onTorchClick()
+{
+    if (torch_button->isChecked())
+    {
+        int val = torch_slider->value() * 100;
+        std::stringstream ss;
+        ss << "0 0 " << val;
+        StringTools::sendSerialString(ss.str());
+    }
+    else
+    {
+        StringTools::sendSerialString("0 0 0");
+    }
 }
 
 void Gui::onExposureEdit()
@@ -180,8 +211,8 @@ void Gui::onExposureEdit()
         QString str = m_exp_field->text();
         receiver->setExposure(str.toInt());
     }
-    setFocus(Qt::OtherFocusReason);
     updateParameters();
+    setFocus(Qt::OtherFocusReason);
 }
 
 void Gui::onBinningEdit()
@@ -190,8 +221,8 @@ void Gui::onBinningEdit()
     {
         receiver->setBinning(bin_field->isChecked());
     }
-    setFocus(Qt::OtherFocusReason);
     updateParameters();
+    setFocus(Qt::OtherFocusReason);
 }
 
 void Gui::onGainEdit()

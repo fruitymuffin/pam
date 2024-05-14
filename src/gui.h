@@ -14,6 +14,8 @@
 #include <QRadioButton>
 #include <QVBoxLayout>
 #include <QKeyEvent>
+#include <QToolButton>
+#include <QSlider>
 
 // eBUS SDK
 #include <PvDisplayWnd.h>
@@ -30,6 +32,7 @@ class Gui : public QWidget, public SignalHandler
     
     public:
         explicit Gui(QWidget *parent = 0);
+        bool isInitialised();
         void setImagePath(const std::string& path);
         bool handleSignal(int signal);
         void quit();
@@ -48,6 +51,7 @@ class Gui : public QWidget, public SignalHandler
         void onExposureEdit();
         void onBinningEdit();
         void onGainEdit();
+        void onTorchClick();
 
     private:
         // Ui element variables
@@ -59,6 +63,8 @@ class Gui : public QWidget, public SignalHandler
         QRadioButton* bin_field;
         QLineEdit* width_field;
         QLineEdit* height_field;
+        QSlider* torch_slider;
+        QToolButton* torch_button;
 
         // The display widget is the container widget of the image display
         QWidget* display_widget;

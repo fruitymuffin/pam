@@ -14,6 +14,12 @@ int main( int argc, char *argv[] )
     QCoreApplication::setApplicationName( "Pam Gui" );
 
     Gui gui;
+    if (!gui.isInitialised())
+    {
+        std::cout << "Failed to initialise receiver" << std::endl;
+        return 0;
+    }
+
     gui.setImagePath(saving_path);
     gui.show();
 
