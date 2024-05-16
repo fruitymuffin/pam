@@ -1,5 +1,5 @@
-#ifndef __STRINGTOOLS_H__
-#define __STRINGTOOLS_H__
+#ifndef __TOOLS_H__
+#define __TOOLS_H__
 
 #include <string>
 #include <sstream>
@@ -14,7 +14,7 @@
 #include <algorithm>
 #include <sys/ioctl.h>
 
-namespace StringTools
+namespace Tools
 {
     inline std::string macToString(int64_t mac)
     {
@@ -102,6 +102,13 @@ namespace StringTools
         close(fd);
         return 0;
     }
+
+    // Approximate the irradiance based on the LED current.
+    // These numbers are explained in section 4 of the report.
+    static inline float irradiance(const float& i)
+    {
+        return 1818.4 * i + 135.26;
+    }
 }
 
-#endif // __STRINGTOOLS_H__
+#endif // __TOOLS_H__

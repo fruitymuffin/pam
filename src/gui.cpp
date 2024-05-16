@@ -1,7 +1,8 @@
 #include "gui.h"
 #include <QLabel>
 #include <QSizePolicy>
-#include "stringtools.h"
+#include <QCloseEvent>
+#include "tools.h"
 
 
 Gui::Gui(QWidget *parent)
@@ -25,6 +26,11 @@ Gui::Gui(QWidget *parent)
     }
 }
 
+void Gui::closeEvent(QCloseEvent *event)
+{
+    quit();
+}
+
 bool Gui::isInitialised()
 {
     return receiver->isConnected();
@@ -34,12 +40,15 @@ bool Gui::handleSignal(int signal)
 {
     quit();
     
-    return false;
+    return true;
 }
 
 void Gui::quit()
 {
     receiver->quit();
+    delete receiver;
+    display_widget->close();
+    display_wnd->Close();
 }
 
 void Gui::setImagePath(const std::string& path)
@@ -152,6 +161,11 @@ QVBoxLayout* Gui::createMenu()
     torch_slider->setMaximum(22);
     torch_slider->setSingleStep(1);
 
+    QLabel* command_label = new QLabel(tr( "Command" ));
+    command_field = new QLineEdit;
+    command_button = new QToolButton();
+    command_button->setText(tr("Send->"));
+
     // Add fields to grid
     int row = 0;
     QGridLayout* grid_layout = new QGridLayout;
@@ -173,7 +187,10 @@ QVBoxLayout* Gui::createMenu()
     grid_layout->addWidget(height_field, row, 1); row++;
     grid_layout->addWidget(torch_label, row, 0);
     grid_layout->addWidget(torch_slider, row, 1); row++;
-    grid_layout->addWidget(torch_button, row, 1);
+    grid_layout->addWidget(torch_button, row, 1); row++;
+    grid_layout->addWidget(command_label, row, 0);
+    grid_layout->addWidget(command_field, row, 1); row++;
+    grid_layout->addWidget(command_button, row, 1);
 
     QVBoxLayout* menu_layout = new QVBoxLayout;
     menu_layout->addLayout(grid_layout);
@@ -184,9 +201,24 @@ QVBoxLayout* Gui::createMenu()
     connect(m_exp_field, SIGNAL(editingFinished()), this, SLOT(onExposureEdit()));
     connect(bin_field, SIGNAL(clicked()), this, SLOT(onBinningEdit()));
     connect(gain_field, SIGNAL(editingFinished()), this, SLOT(onGainEdit()));
+    connect(command_field, SIGNAL(editingFinished()), this, SLOT(onCommandEdit()));
     connect(torch_button, SIGNAL(released()), this, SLOT(onTorchClick()));
+    connect(command_button, SIGNAL(released()), this, SLOT(onCommandClick()));
+
 
     return menu_layout;
+}
+
+void Gui::onCommandEdit()
+{
+    setFocus(Qt::OtherFocusReason);
+}
+
+void Gui::onCommandClick()
+{
+    QString str = command_field->text();
+    Tools::sendSerialString(str.toStdString());
+    setFocus(Qt::OtherFocusReason);
 }
 
 void Gui::onTorchClick()
@@ -196,12 +228,13 @@ void Gui::onTorchClick()
         int val = torch_slider->value() * 100;
         std::stringstream ss;
         ss << "0 0 " << val;
-        StringTools::sendSerialString(ss.str());
+        Tools::sendSerialString(ss.str());
     }
     else
     {
-        StringTools::sendSerialString("0 0 0");
+        Tools::sendSerialString("0 0 0");
     }
+    setFocus(Qt::OtherFocusReason);
 }
 
 void Gui::onExposureEdit()
@@ -239,19 +272,12 @@ void Gui::onGainEdit()
 // Keypress event
 void Gui::keyPressEvent(QKeyEvent* event)
 {
-    switch(event->key())
+    if (event->key() == Qt::Key_Space)
     {
-        case Qt::Key_Space:
-            // start/stop stream
+        // start/stop stream
             if (receiver->isConnected())
             {
                 receiver->setState();
             }
-            break;
-
-        case Qt::Key_S:
-            // Send a serial string
-            StringTools::sendSerialString(SEND_STR);
-            break;
     }
 }

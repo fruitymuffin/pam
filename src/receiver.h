@@ -23,6 +23,7 @@
 #include <vector>
 #include <list>
 #include <iomanip>
+#include <mutex>
 
 // eBUS SDK
 #include <PvSystem.h>
@@ -37,7 +38,7 @@
 
 // project
 #include "displaythread.h"
-#include "stringtools.h"
+#include "tools.h"
 
 // Default software-side params
 #define DEFAULT_BUFFER_COUNT 4
@@ -68,7 +69,6 @@ class Receiver : public PvAcquisitionStateEventSink
 {
     public:
         Receiver(PvDisplayWnd* _display_wnd);
-        ~Receiver();
         
         // Pulic functions
         void quit();
@@ -123,6 +123,7 @@ class Receiver : public PvAcquisitionStateEventSink
         DeviceParams device_params;     // Struct with some params for populating gui
         PvAcquisitionStateManager* acquisition_manager;
 
+        std::mutex mtx;
         int state;
     };
 

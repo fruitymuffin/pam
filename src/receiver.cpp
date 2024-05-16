@@ -43,21 +43,22 @@ Receiver::Receiver(PvDisplayWnd* _display_wnd) :
     }
 }
 
-Receiver::~Receiver()
-{
-    stream->Close();
-    PvStream::Free(stream); 
-    device->Disconnect();
-    PvDevice::Free(device);
-}
-
 void Receiver::quit()
 {
     stopAcquisition();
+
     display_thread->Stop(false);
     pipeline->Stop();
+    
     stream->Close();
+    PvStream::Free(stream);
+
     device->Disconnect();
+    PvDevice::Free(device);
+    
+    display_wnd->Close();
+
+    delete pipeline;
 }
 
 DeviceParams Receiver::getDeviceParams()
@@ -78,16 +79,16 @@ DeviceParams Receiver::getDeviceParams()
         device_params.name = val_str.GetAscii();
 
         params->GetInteger("GevCurrentIPAddress")->GetValue(val_int);
-        device_params.ip = StringTools::ipToString(val_int);
+        device_params.ip = Tools::ipToString(val_int);
 
         params->GetInteger("GevMACAddress")->GetValue(val_int);
-        device_params.mac = StringTools::macToString(val_int);
+        device_params.mac = Tools::macToString(val_int);
 
         params->GetFloat("Gain")->GetValue(val_float);
-        device_params.gain = StringTools::doubleToString(val_float);
+        device_params.gain = Tools::doubleToString(val_float);
 
         params->GetFloat("ExposureTime")->GetValue(val_float);
-        device_params.exposure = StringTools::doubleToString(val_float);
+        device_params.exposure = Tools::doubleToString(val_float);
 
         params->GetInteger("BinningHorizontal")->GetValue(val_int);
         device_params.binning = std::to_string(val_int);
@@ -208,18 +209,22 @@ void Receiver::configureStream()
 
 void Receiver::stopAcquisition()
 {
+    mtx.lock();
     if (acquisition_manager->GetState() == PvAcquisitionStateLocked)
     {
         acquisition_manager->Stop();
     }
+    mtx.unlock();
 }
 
 void Receiver::startAcquisition()
 {
+    mtx.lock();
     if (acquisition_manager->GetState() != PvAcquisitionStateLocked)
     {
         acquisition_manager->Start();
     }
+    mtx.unlock();
 }
 
 void Receiver::createStreamBuffers()
@@ -380,11 +385,14 @@ void Receiver::resetStream()
 
 void Receiver::OnAcquisitionStateChanged(PvDevice* _device, PvStream* _stream, uint32_t _source, PvAcquisitionState _state )
 {
-    if (_state == PvAcquisitionStateUnlocked )
+    if (device != NULL && isConnected())
     {
-        if(state == MULTIFRAME)
+        if (_state == PvAcquisitionStateUnlocked )
         {
-            setState();
+            if(state == MULTIFRAME)
+            {
+                setState();
+            }
         }
     }
 }
@@ -403,13 +411,14 @@ void Receiver::setState()
         pipeline->Reset();
         startViewFinderMode();
         state = CONTINIOUS;
-        std::cout << "Starting viewfinder" << std::endl;
+        display_wnd->SetTextOverlay("Viewfinder");
     }
     else if (state == MULTIFRAME)
     {
         stopAcquisition();
         state = PAUSED;
-        std::cout << "Paused" << std::endl;
+        display_wnd->SetTextOverlay("Paused");
+        
     }
     else
     {
@@ -419,6 +428,11 @@ void Receiver::setState()
         display_thread->setSaving(true);
         
         state = MULTIFRAME;
-        std::cout << "Starting multiframe(5)" << std::endl;
+        
+        display_wnd->SetTextOverlay("Recording");
+
+        // Redraw the display to apply the text overlay. This is only necessary 
+        // for multiframe mode where we are waiting for trigger acquisition.
+        display_wnd->Display(display_wnd->GetInternalBuffer());
     }
 }

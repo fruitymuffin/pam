@@ -24,7 +24,7 @@
 #include "receiver.h"
 #include "signalhandler.h"
 
-static const std::string SEND_STR = "1 0 800    5 0 0    5 100 0 2 100 512     1 199 1200    5 200 0 2 200 300000 5 498 0    5 700 0";
+static const std::string SEND_STR = "1 0 800    5 0 0   2 100 512 5 100 0      1 199 2500    2 200 400000 5 500 0   5 750 0 5 850 0";
 
 class Gui : public QWidget, public SignalHandler
 {
@@ -39,6 +39,7 @@ class Gui : public QWidget, public SignalHandler
 
     protected:
         void keyPressEvent(QKeyEvent* event) override;
+        void closeEvent(QCloseEvent *event) override;
 
     private:
         // Ui element functions
@@ -52,6 +53,8 @@ class Gui : public QWidget, public SignalHandler
         void onBinningEdit();
         void onGainEdit();
         void onTorchClick();
+        void onCommandClick();
+        void onCommandEdit();
 
     private:
         // Ui element variables
@@ -63,8 +66,10 @@ class Gui : public QWidget, public SignalHandler
         QRadioButton* bin_field;
         QLineEdit* width_field;
         QLineEdit* height_field;
+        QLineEdit* command_field;
         QSlider* torch_slider;
         QToolButton* torch_button;
+        QToolButton* command_button;
 
         // The display widget is the container widget of the image display
         QWidget* display_widget;
